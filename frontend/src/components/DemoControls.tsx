@@ -5,13 +5,13 @@ export function DemoControls() {
     const { isDemoMode, setDemoMode } = useStore();
 
     return (
-        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 shadow-xl flex items-center justify-between">
+        <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 shadow-xl flex items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 whitespace-nowrap">
                     <div className={`w-3 h-3 rounded-full ${isDemoMode ? 'bg-orange-500 animate-pulse' : 'bg-slate-600'}`}></div>
                     <span className="text-white font-bold">Demo Mode</span>
                 </div>
-                <div className="text-sm text-slate-400">
+                <div className="text-sm text-slate-400 hidden lg:block whitespace-nowrap">
                     Simulated Scenarios
                 </div>
             </div>
