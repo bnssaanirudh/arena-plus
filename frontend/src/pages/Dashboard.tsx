@@ -66,7 +66,10 @@ export default function Dashboard() {
       </header>
 
       {/* Hero Map Section (Locked Proportions via Aspect Ratio) */}
-      <section className="relative w-full aspect-[4/3] md:aspect-[16/9] lg:aspect-[21/9] min-h-[500px] max-h-[85vh] overflow-hidden bg-[#111]">
+      <section 
+        className="relative w-full aspect-[4/3] md:aspect-[16/9] lg:aspect-[21/9] min-h-[500px] max-h-[85vh] overflow-hidden bg-[#111]"
+        style={{ containerType: 'inline-size' }}
+      >
         {/* Shifting the map container down so it doesn't overlap with the absolute header */}
         <div className="absolute top-28 inset-x-0 bottom-0 z-0 opacity-80">
           <StadiumMap />
@@ -75,10 +78,10 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60 pointer-events-none z-10"></div>
         
         {/* Glassmorphic Panel over Map */}
-        <div className="absolute bottom-[max(2rem,2vw)] left-[max(2rem,2vw)] z-20 w-[max(24rem,25vw)] pointer-events-auto">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-[max(1.5rem,1.5vw)]">
-            <h2 className="font-black uppercase tracking-widest text-orange-500 mb-[max(1rem,1vw)] text-[max(1.25rem,1.5vw)]">Live Telemetry</h2>
-            <div className="overflow-y-auto custom-scrollbar pr-[max(0.5rem,0.5vw)] max-h-[max(16rem,20vw)]">
+        <div className="absolute bottom-[2cqw] left-[2cqw] z-20 w-[30cqw] pointer-events-auto">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-[1.5cqw]">
+            <h2 className="font-black uppercase tracking-widest text-orange-500 mb-[1cqw] text-[1.5cqw]">Live Telemetry</h2>
+            <div className="overflow-y-auto custom-scrollbar pr-[0.5cqw] max-h-[25cqw]">
               <LiveFeed />
             </div>
           </div>
