@@ -100,16 +100,16 @@ export default function Dashboard() {
         <h2 className="text-5xl lg:text-7xl font-black uppercase mb-16 tracking-tight">System Status</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col min-h-[500px]">
+          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
             <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-slate-400">Global Analytics</h3>
-            <div className="flex-1">
+            <div className="flex-1 min-h-0">
               <Analytics />
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col min-h-[500px]">
+          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
             <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-orange-500">Active Agents</h3>
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
               <AgentPanel />
             </div>
           </div>
