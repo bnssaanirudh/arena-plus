@@ -8,21 +8,29 @@ import { DemoControls } from '../components/DemoControls';
 import { useStore } from '../store/useStore';
 
 export default function Dashboard() {
-  const { addEvent } = useStore();
+  const { addEvent, addAgentAction } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:8000/api/v1/events/live');
+    const ws = new WebSocket('ws://localhost:8000/api/v1/ws/dashboard');
     
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      addEvent(data);
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'telemetry') {
+          addEvent(payload.data);
+        } else if (payload.type === 'agent_action') {
+          addAgentAction(payload.data);
+        }
+      } catch (e) {
+        console.error("Failed to parse websocket message", e);
+      }
     };
 
     return () => {
-      eventSource.close();
+      ws.close();
     };
-  }, [addEvent]);
+  }, [addEvent, addAgentAction]);
 
   return (
     <div className="w-full min-h-screen flex flex-col relative bg-black text-white selection:bg-orange-500 selection:text-white pb-20">

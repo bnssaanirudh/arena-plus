@@ -1,0 +1,39 @@
+Best Model: XGBoost (F1=0.9926)
+
+=== XGBoost ===
+Accuracy:  0.9912
+Precision: 1.0000
+Recall:    0.9853
+F1 Score:  0.9926
+Confusion Matrix:
+[[ 681    0]
+ [  15 1004]]
+
+              precision    recall  f1-score   support
+
+           0       0.98      1.00      0.99       681
+           1       1.00      0.99      0.99      1019
+
+    accuracy                           0.99      1700
+   macro avg       0.99      0.99      0.99      1700
+weighted avg       0.99      0.99      0.99      1700
+
+
+=== RandomForest ===
+Accuracy:  0.9818
+Precision: 0.9843
+Recall:    0.9853
+F1 Score:  0.9848
+Confusion Matrix:
+[[ 665   16]
+ [  15 1004]]
+
+              precision    recall  f1-score   support
+
+           0       0.98      0.98      0.98       681
+           1       0.98      0.99      0.98      1019
+
+    accuracy                           0.98      1700
+   macro avg       0.98      0.98      0.98      1700
+weighted avg       0.98      0.98      0.98      1700
+

@@ -27,13 +27,21 @@ class SimulatorEngine:
         
     async def _run_loop(self):
         from ..agents.manager import agent_manager
+        from ..infra.pubsub import pubsub
+        
         while self.running:
             if settings.SIMULATION_ACTIVE:
                 event = generate_random_event()
+                
+                # Publish raw telemetry for WebSocket clients
+                await pubsub.publish("arena:telemetry:raw", event, source="Simulator")
+                
                 # Process the event through the AI agent pipeline in the background
                 asyncio.create_task(agent_manager.process_event(event))
                 
+                # Legacy SSE subscriber notification
                 await self._notify_subscribers(event)
+                
             await asyncio.sleep(settings.SIMULATION_INTERVAL_SECONDS)
             
     async def _notify_subscribers(self, event: dict):
