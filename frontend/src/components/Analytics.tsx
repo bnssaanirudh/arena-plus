@@ -19,28 +19,32 @@ export function Analytics() {
             </h2>
             
             <div className="flex-1 min-h-0 flex flex-col gap-4">
-                <div className="flex-1 bg-slate-900 rounded-lg p-2 border border-slate-700">
-                    <h3 className="text-xs text-slate-400 mb-2 pl-2">Density Trend</h3>
-                    <ResponsiveContainer width="100%" height="80%">
-                        <LineChart data={data}>
-                            <XAxis dataKey="time" hide />
-                            <YAxis domain={[0, 10]} hide />
-                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                            <Line type="monotone" dataKey="density" stroke="#22c55e" strokeWidth={2} dot={false} />
-                        </LineChart>
-                    </ResponsiveContainer>
+                <div className="flex-1 min-h-[200px] bg-slate-900 rounded-lg p-3 border border-slate-700 flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-400 mb-2 pl-2">Density Trend</h3>
+                    <div className="flex-1 w-full min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickMargin={5} />
+                                <YAxis domain={[0, 10]} stroke="#64748b" fontSize={10} />
+                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '6px' }} itemStyle={{ color: '#22c55e' }} />
+                                <Line type="monotone" dataKey="density" stroke="#22c55e" strokeWidth={2} dot={false} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
 
-                <div className="flex-1 bg-slate-900 rounded-lg p-2 border border-slate-700">
-                    <h3 className="text-xs text-slate-400 mb-2 pl-2">Crowd Volume</h3>
-                    <ResponsiveContainer width="100%" height="80%">
-                        <AreaChart data={data}>
-                            <XAxis dataKey="time" hide />
-                            <YAxis hide />
-                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                            <Area type="monotone" dataKey="people" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                <div className="flex-1 min-h-[200px] bg-slate-900 rounded-lg p-3 border border-slate-700 flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-400 mb-2 pl-2">Crowd Volume</h3>
+                    <div className="flex-1 w-full min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                <XAxis dataKey="time" stroke="#64748b" fontSize={10} tickMargin={5} />
+                                <YAxis stroke="#64748b" fontSize={10} />
+                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '6px' }} itemStyle={{ color: '#3b82f6' }} />
+                                <Area type="monotone" dataKey="people" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
         </div>
