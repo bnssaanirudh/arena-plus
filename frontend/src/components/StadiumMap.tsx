@@ -31,11 +31,11 @@ export function StadiumMap() {
 
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border border-slate-700 shadow-xl relative">
-            <div className="absolute top-[1cqw] left-[1cqw] z-[1000] bg-slate-900/80 p-[1cqw] rounded backdrop-blur-sm border border-slate-700">
-                <h3 className="text-white font-bold text-[1.5cqw]">Arena Map</h3>
-                <div className="flex flex-col gap-[0.5cqw] mt-[0.8cqw] text-[1cqw]">
-                    <div className="flex items-center gap-[0.8cqw]"><span className="w-[1cqw] h-[1cqw] rounded-full bg-blue-500"></span> Vendors</div>
-                    <div className="flex items-center gap-[0.8cqw]"><span className="w-[1cqw] h-[1cqw] rounded-full bg-red-500 animate-ping"></span> Crowd Surge</div>
+            <div className="absolute top-[1em] left-[1em] z-[1000] bg-slate-900/80 p-[1em] rounded-[0.5em] backdrop-blur-sm border border-slate-700" style={{ fontSize: 'max(8px, 1.2vmin)' }}>
+                <h3 className="text-white font-bold text-[1.5em]">Arena Map</h3>
+                <div className="flex flex-col gap-[0.5em] mt-[0.8em] text-[1em]">
+                    <div className="flex items-center gap-[0.8em]"><span className="w-[1em] h-[1em] rounded-full bg-blue-500"></span> Vendors</div>
+                    <div className="flex items-center gap-[0.8em]"><span className="w-[1em] h-[1em] rounded-full bg-red-500 animate-ping"></span> Crowd Surge</div>
                 </div>
             </div>
             <MapContainer 
