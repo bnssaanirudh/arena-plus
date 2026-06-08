@@ -75,10 +75,10 @@ export default function Dashboard() {
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60 pointer-events-none z-10"></div>
         
         {/* Glassmorphic Panel over Map */}
-        <div className="absolute bottom-8 left-8 z-20 w-full max-w-md pointer-events-auto">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-6">
-            <h2 className="text-xl font-black uppercase mb-4 tracking-widest text-orange-500">Live Telemetry</h2>
-            <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="absolute bottom-[max(2rem,2vw)] left-[max(2rem,2vw)] z-20 w-[max(24rem,25vw)] pointer-events-auto">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-[max(1.5rem,1.5vw)]">
+            <h2 className="font-black uppercase tracking-widest text-orange-500 mb-[max(1rem,1vw)] text-[max(1.25rem,1.5vw)]">Live Telemetry</h2>
+            <div className="overflow-y-auto custom-scrollbar pr-[max(0.5rem,0.5vw)] max-h-[max(16rem,20vw)]">
               <LiveFeed />
             </div>
           </div>

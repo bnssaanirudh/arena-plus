@@ -31,11 +31,11 @@ export function StadiumMap() {
 
     return (
         <div className="w-full h-full rounded-lg overflow-hidden border border-slate-700 shadow-xl relative">
-            <div className="absolute top-4 left-4 z-[1000] bg-slate-900/80 p-3 rounded backdrop-blur-sm border border-slate-700">
-                <h3 className="text-white font-bold text-lg">Arena Map</h3>
-                <div className="flex flex-col gap-1 mt-2 text-sm">
-                    <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500"></span> Vendors</div>
-                    <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span> Crowd Surge</div>
+            <div className="absolute top-[max(1rem,1vw)] left-[max(1rem,1vw)] z-[1000] bg-slate-900/80 p-[max(0.75rem,1vw)] rounded backdrop-blur-sm border border-slate-700">
+                <h3 className="text-white font-bold text-[max(1.125rem,1.5vw)]">Arena Map</h3>
+                <div className="flex flex-col gap-[max(0.25rem,0.5vw)] mt-[max(0.5rem,0.8vw)] text-[max(0.875rem,1vw)]">
+                    <div className="flex items-center gap-[max(0.5rem,0.8vw)]"><span className="w-[max(0.75rem,1vw)] h-[max(0.75rem,1vw)] rounded-full bg-blue-500"></span> Vendors</div>
+                    <div className="flex items-center gap-[max(0.5rem,0.8vw)]"><span className="w-[max(0.75rem,1vw)] h-[max(0.75rem,1vw)] rounded-full bg-red-500 animate-ping"></span> Crowd Surge</div>
                 </div>
             </div>
             <MapContainer 
