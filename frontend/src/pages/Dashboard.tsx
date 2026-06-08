@@ -67,7 +67,8 @@ export default function Dashboard() {
 
       {/* Hero Map Section */}
       <section className="relative w-full h-[85vh] overflow-hidden bg-[#111]">
-        <div className="absolute inset-0 z-0 opacity-80">
+        {/* Shifting the map container down so it doesn't overlap with the absolute header */}
+        <div className="absolute top-28 inset-x-0 bottom-0 z-0 opacity-80">
           <StadiumMap />
         </div>
         
