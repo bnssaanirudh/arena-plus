@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-white text-[#111111] font-sans overflow-x-hidden m-0 p-0;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  /* Navigation Overlay */
+  .bs-nav-overlay {
+    @apply fixed inset-0 bg-[#f4f4f4] text-black z-[90] flex flex-col justify-center px-16 py-16 transition-all duration-700 ease-[cubic-bezier(0.77,0,0.175,1)];
+    clip-path: circle(0% at 100% 0%);
+  }
+  .bs-nav-overlay.open {
+    clip-path: circle(150% at 100% 0%);
+  }
+  
+  .bs-nav-link {
+    @apply text-5xl md:text-7xl font-black uppercase border-b-2 border-black/10 py-6 transition-all duration-300;
+  }
+  .bs-nav-link:hover {
+    @apply pl-8 text-orange-600 border-orange-600;
+  }
+
+  /* Ticker */
+  .bs-ticker-container {
+    @apply overflow-hidden whitespace-nowrap w-full py-4 bg-[#111111] text-white flex;
+  }
+  
+  .bs-ticker {
+    @apply inline-block font-bold uppercase text-xl md:text-3xl tracking-[0.2em] px-4;
+    animation: ticker 30s linear infinite;
+  }
+
+  @keyframes ticker {
+    0% { transform: translate3d(0, 0, 0); }
+    100% { transform: translate3d(-100%, 0, 0); }
+  }
+
+  /* Grid/Cards */
+  .bs-card {
+    @apply relative overflow-hidden aspect-[4/3] cursor-pointer;
+  }
+  
+  .bs-card img {
+    @apply absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105;
+  }
+
+  .bs-card-overlay {
+    @apply absolute inset-0 bg-black/40 transition-opacity duration-500 group-hover:bg-black/20 flex flex-col justify-end p-8 md:p-12;
+  }
+
+  /* BaseStructures specific text */
+  .bs-outline-text {
+    -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
+    color: transparent;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+::-webkit-scrollbar-thumb {
+  background: #888;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

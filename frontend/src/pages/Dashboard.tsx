@@ -1,0 +1,112 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { StadiumMap } from '../components/StadiumMap';
+import { LiveFeed } from '../components/LiveFeed';
+import { AgentPanel } from '../components/AgentPanel';
+import { Analytics } from '../components/Analytics';
+import { DemoControls } from '../components/DemoControls';
+import { useStore } from '../store/useStore';
+
+export default function Dashboard() {
+  const { addEvent } = useStore();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const eventSource = new EventSource('http://localhost:8000/api/v1/events/live');
+    
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      addEvent(data);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [addEvent]);
+
+  return (
+    <div className="w-full min-h-screen flex flex-col relative bg-black text-white selection:bg-orange-500 selection:text-white pb-20">
+      
+      {/* Navigation Overlay */}
+      <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
+        <Link to="/" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Home</Link>
+        <a href="#" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Status</a>
+        <a href="#" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Global Analytics</a>
+      </div>
+
+      {/* Absolute Header Overlay */}
+      <header className="absolute top-0 left-0 w-full z-[100] flex justify-between items-center p-8 pointer-events-none text-white">
+        <div className="pointer-events-auto">
+            <Link to="/" className="text-3xl font-black tracking-tighter uppercase flex items-center gap-2">
+              <span className="w-4 h-4 bg-orange-500 rounded-full animate-pulse"></span>
+              ArenaPulse
+            </Link>
+        </div>
+        <div className="pointer-events-auto flex items-center gap-6">
+          <DemoControls />
+          <button 
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="flex items-center gap-4 hover:opacity-70 transition-opacity uppercase font-bold text-sm tracking-widest"
+          >
+            <span className="hidden md:block">{menuOpen ? 'Close' : 'Menu'}</span>
+            <div className="flex flex-col gap-[6px]">
+              <span className={`w-8 h-[2px] block transition-transform origin-center ${menuOpen ? 'rotate-45 translate-y-[8px] bg-black' : 'bg-white'}`}></span>
+              <span className={`w-8 h-[2px] block transition-transform origin-center ${menuOpen ? '-rotate-45 -translate-y-[8px] bg-black' : 'bg-white'}`}></span>
+            </div>
+          </button>
+        </div>
+      </header>
+
+      {/* Hero Map Section */}
+      <section className="relative w-full h-[85vh] overflow-hidden bg-[#111]">
+        <div className="absolute inset-0 z-0 opacity-80">
+          <StadiumMap />
+        </div>
+        
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60 pointer-events-none z-10"></div>
+        
+        {/* Glassmorphic Panel over Map */}
+        <div className="absolute bottom-8 left-8 z-20 w-full max-w-md pointer-events-auto">
+          <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-6">
+            <h2 className="text-xl font-black uppercase mb-4 tracking-widest text-orange-500">Live Telemetry</h2>
+            <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+              <LiveFeed />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Ticker Divider */}
+      <div className="bs-ticker-container border-y border-white/10 my-0">
+        <div className="bs-ticker">
+          AUTONOMOUS LOGISTICS INTELLIGENCE ✦ CROWD TELEMETRY ACTIVE ✦ AGENT RESOURCES DEPLOYED ✦ AUTONOMOUS LOGISTICS INTELLIGENCE ✦ 
+        </div>
+        <div className="bs-ticker" aria-hidden="true">
+          AUTONOMOUS LOGISTICS INTELLIGENCE ✦ CROWD TELEMETRY ACTIVE ✦ AGENT RESOURCES DEPLOYED ✦ AUTONOMOUS LOGISTICS INTELLIGENCE ✦ 
+        </div>
+      </div>
+
+      {/* Content Grid */}
+      <section className="w-full bg-white text-black p-8 lg:p-16">
+        <h2 className="text-5xl lg:text-7xl font-black uppercase mb-16 tracking-tight">System Status</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col min-h-[500px]">
+            <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-slate-400">Global Analytics</h3>
+            <div className="flex-1">
+              <Analytics />
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col min-h-[500px]">
+            <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-orange-500">Active Agents</h3>
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              <AgentPanel />
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  );
+}
