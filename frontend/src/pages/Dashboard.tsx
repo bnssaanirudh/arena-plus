@@ -33,7 +33,7 @@ export default function Dashboard() {
   }, [addEvent, addAgentAction]);
 
   return (
-    <div className="w-full min-h-screen flex flex-col relative bg-black text-white selection:bg-orange-500 selection:text-white pb-20">
+    <div className="w-full h-screen overflow-hidden flex flex-col relative bg-black text-white selection:bg-orange-500 selection:text-white">
       
       {/* Navigation Overlay */}
       <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
@@ -65,8 +65,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Hero Map Section */}
-      <section className="relative w-full h-[600px] lg:h-[800px] overflow-hidden bg-[#111]">
+      {/* Hero Map Section (Takes 55% of flexible height) */}
+      <section className="relative w-full flex-[55] min-h-0 overflow-hidden bg-[#111]">
         {/* Shifting the map container down so it doesn't overlap with the absolute header */}
         <div className="absolute top-28 inset-x-0 bottom-0 z-0 opacity-80">
           <StadiumMap />
@@ -86,7 +86,7 @@ export default function Dashboard() {
       </section>
 
       {/* Ticker Divider */}
-      <div className="bs-ticker-container border-y border-white/10 my-0">
+      <div className="bs-ticker-container border-y border-white/10 my-0 shrink-0">
         <div className="bs-ticker">
           AUTONOMOUS LOGISTICS INTELLIGENCE ✦ CROWD TELEMETRY ACTIVE ✦ AGENT RESOURCES DEPLOYED ✦ AUTONOMOUS LOGISTICS INTELLIGENCE ✦ 
         </div>
@@ -95,20 +95,20 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Content Grid */}
-      <section className="w-full bg-white text-black p-8 lg:p-16">
-        <h2 className="text-5xl lg:text-7xl font-black uppercase mb-16 tracking-tight">System Status</h2>
+      {/* Content Grid (Takes 45% of flexible height) */}
+      <section className="w-full flex-[45] min-h-0 flex flex-col bg-white text-black p-6 lg:p-8">
+        <h2 className="text-3xl lg:text-5xl font-black uppercase mb-6 tracking-tight shrink-0">System Status</h2>
         
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
-            <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-slate-400">Global Analytics</h3>
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col h-full">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-slate-400 shrink-0">Global Analytics</h3>
             <div className="flex-1 min-h-0">
               <Analytics />
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
-            <h3 className="text-2xl font-bold uppercase mb-6 tracking-widest text-orange-500">Active Agents</h3>
+          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col h-full">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-orange-500 shrink-0">Active Agents</h3>
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
               <AgentPanel />
             </div>
