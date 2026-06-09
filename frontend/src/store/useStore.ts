@@ -62,12 +62,25 @@ export interface PendingApproval {
   timestamp: string;
 }
 
+export interface VerificationInfo {
+  event_id: string;
+  feasible: boolean;
+  confidence: string;
+  blocking: string[];
+  correction: string;
+  replan_count: number;
+  constraints_checked: number;
+  verified_by: string;
+  timestamp: string;
+}
+
 interface AppState {
   liveEvents: TelemetryEvent[];
   agentActions: AgentAction[];
   flashDeals: FlashDeal[];
   restockBatches: RestockBatch[];
   pendingApprovals: PendingApproval[];
+  verifications: Record<string, VerificationInfo>;
   isDemoMode: boolean;
 
   addEvent: (event: TelemetryEvent) => void;
@@ -77,6 +90,7 @@ interface AppState {
   addApproval: (approval: PendingApproval) => void;
   resolveApproval: (event_id: string) => void;
   acknowledgeRestockOrders: (event_id: string, acks: RestockAck[]) => void;
+  addVerification: (v: VerificationInfo) => void;
   setDemoMode: (val: boolean) => void;
 }
 
@@ -86,6 +100,7 @@ export const useStore = create<AppState>((set) => ({
   flashDeals: [],
   restockBatches: [],
   pendingApprovals: [],
+  verifications: {},
   isDemoMode: false,
 
   addEvent: (event) => set((state) => {
@@ -131,6 +146,12 @@ export const useStore = create<AppState>((set) => ({
             }
       ),
     };
+  }),
+  addVerification: (v) => set((state) => {
+    // Keep the latest verification per event (self-correction overwrites prior)
+    const prev = state.verifications[v.event_id];
+    if (prev && prev.replan_count > v.replan_count) return state;
+    return { verifications: { ...state.verifications, [v.event_id]: v } };
   }),
   setDemoMode: (val) => set({ isDemoMode: val }),
 }));

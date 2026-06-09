@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useStore, type AgentAction } from '../store/useStore';
+import { useStore, type AgentAction, type VerificationInfo } from '../store/useStore';
 
 // ── Stage metadata ────────────────────────────────────────────────────────────
 const STAGES: Record<string, { idx: number; label: string; dot: string; text: string }> = {
@@ -52,11 +52,12 @@ interface EventGroup {
   firstTs: string;
   completed: boolean;
   stageCount: number;
+  verification?: VerificationInfo;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function EventTimeline() {
-  const { agentActions } = useStore();
+  const { agentActions, verifications } = useStore();
 
   const groups = useMemo<EventGroup[]>(() => {
     const map = new Map<string, AgentAction[]>();
@@ -77,11 +78,12 @@ export function EventTimeline() {
           firstTs: sorted[0]?.timestamp ?? '',
           completed,
           stageCount: sorted.filter((a) => a.stage !== 'pipeline').length,
+          verification: verifications[eventId],
         };
       })
       .sort((a, b) => new Date(b.firstTs).getTime() - new Date(a.firstTs).getTime())
       .slice(0, 12);
-  }, [agentActions]);
+  }, [agentActions, verifications]);
 
   return (
     <div className="h-full flex flex-col">
@@ -124,15 +126,35 @@ export function EventTimeline() {
                 </span>
               </div>
 
-              {/* Timestamp */}
-              <div className="px-3 pt-1.5 text-[10px] text-slate-500">
-                {g.firstTs ? new Date(g.firstTs).toLocaleTimeString() : '—'}
+              {/* Timestamp + verification badge */}
+              <div className="px-3 pt-1.5 flex items-center justify-between gap-1">
+                <span className="text-[10px] text-slate-500">
+                  {g.firstTs ? new Date(g.firstTs).toLocaleTimeString() : '—'}
+                </span>
+                {g.verification && (
+                  <span
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                      g.verification.feasible
+                        ? 'bg-indigo-900/50 text-indigo-300'
+                        : 'bg-amber-900/50 text-amber-300'
+                    }`}
+                    title={
+                      g.verification.feasible
+                        ? `RAG: feasible (${g.verification.confidence}) · ${g.verification.constraints_checked} constraint(s) checked`
+                        : `RAG: infeasible · ${g.verification.replan_count} self-correction(s) · ${g.verification.correction}`
+                    }
+                  >
+                    {g.verification.feasible
+                      ? `⑤ feasible`
+                      : `⑤ ↻${g.verification.replan_count}`}
+                  </span>
+                )}
               </div>
 
               {/* Stage rows */}
               <div className="flex-1 overflow-y-auto px-3 pb-2 pt-1 custom-scrollbar">
-                {g.actions.map((a, i) => (
-                  <StageRow key={i} action={a} />
+                {g.actions.map((a) => (
+                  <StageRow key={`${a.stage}-${a.timestamp}`} action={a} />
                 ))}
               </div>
             </div>

@@ -8,6 +8,19 @@ from ..infra.pubsub import pubsub, Channels
 
 router = APIRouter()
 
+# Channel → pipeline stage name (used by EventTimeline frontend). Module-level
+# constant — built once, not on every pub/sub message.
+_STAGE_NAME = {
+    Channels.AGENT_PIPELINE:     "pipeline",
+    Channels.AGENT_PERCEPTION:   "perception",
+    Channels.AGENT_PLANNING:     "planning",
+    Channels.AGENT_INVENTORY:    "inventory",
+    Channels.AGENT_VALIDATION:   "validation",
+    Channels.AGENT_VERIFICATION: "verification",
+    Channels.AGENT_EXECUTION:    "execution",
+    Channels.AGENT_MARKETING:    "marketing",
+}
+
 async def multiplex_queues(queues):
     """Multiplexes messages from multiple asyncio Queues into a single async generator."""
     tasks = [asyncio.create_task(q.get()) for q in queues]
@@ -204,17 +217,6 @@ async def websocket_dashboard(websocket: WebSocket):
                         "data": {"event_id": data.get("event_id"), "result": data.get("result")}
                     })
 
-            # Channel → pipeline stage name (used by EventTimeline frontend)
-            _STAGE_NAME = {
-                Channels.AGENT_PIPELINE:     "pipeline",
-                Channels.AGENT_PERCEPTION:   "perception",
-                Channels.AGENT_PLANNING:     "planning",
-                Channels.AGENT_INVENTORY:    "inventory",
-                Channels.AGENT_VALIDATION:   "validation",
-                Channels.AGENT_VERIFICATION: "verification",
-                Channels.AGENT_EXECUTION:    "execution",
-                Channels.AGENT_MARKETING:    "marketing",
-            }
             # Always send the agent_action for AgentPanel + EventTimeline
             await websocket.send_json({
                 "type": "agent_action",

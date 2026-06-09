@@ -32,7 +32,7 @@ pytest                                   # all tests
 pytest tests/test_agents.py              # one file
 pytest tests/test_agents.py::test_name   # one test
 ```
-Tests use `pytest-asyncio`. Test files manipulate `sys.path` to import `app` directly, so run pytest from the `backend/` directory.
+Tests use `pytest-asyncio` (**57 tests**). Test files manipulate `sys.path` to import `app` directly, so run pytest from the `backend/` directory. `test_execution.py` covers the B2B restock-order builder + the supplier-ack loop (the 8–20 s sleep is monkeypatched out so it runs instantly).
 
 ### ML model
 ```bash
@@ -75,7 +75,7 @@ The system runs with **nothing external configured**:
 When adding features, preserve this zero-external-deps property — credentials should *upgrade* behavior, never be *required* to boot.
 
 ### Config (`backend/app/config.py`)
-Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`. Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (default `gemini-3-pro-preview`), `GEMINI_API_KEY`. Agent: `USE_ADK` (default true — route planning through the ADK agent when available), `APPROVAL_REQUIRED` (default false), `APPROVAL_RESOURCE_THRESHOLD` (default 5000). See `backend/.env.example`.
+Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")`. Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`. Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (default `gemini-3-pro-preview`), `GEMINI_API_KEY`. Agent: `USE_ADK` (default true — route planning through the ADK agent when available), `APPROVAL_REQUIRED` (default false), `APPROVAL_RESOURCE_THRESHOLD` (default 5000). See `backend/.env.example`.
 
 ### REST routers (`backend/app/routers/`, prefix `/api/v1`)
 - `events` — `GET /history` (last 100 events, newest-first, `?limit=`), **`POST /trigger`** (inject single event + run pipeline), **`POST /demo`** (fire scripted 5-event surge cascade — background task, streams over WS)
@@ -89,11 +89,12 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 `observability/tracer.py` `setup_phoenix()` — uses `arize-phoenix-otel` (lightweight OTLP, no OTel version conflict with google-adk). No-ops cleanly (INFO log only) when `PHOENIX_COLLECTOR_ENDPOINT` is not set. Set it to `http://localhost:6006/v1/traces` (local Phoenix server) or Arize AX cloud endpoint (M6) to enable tracing. `opentelemetry-sdk` is pinned `<1.42` to stay compatible with `google-adk 2.x`.
 
 ### Frontend (`frontend/src/`)
-- React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`, no config file) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`) — types: `TelemetryEvent`, `AgentAction` (includes `event_id?`, `stage?`), `FlashDeal`, `RestockBatch`, `RestockOrder` (includes `ack_at?`), `RestockAck`, `PendingApproval`; all `addX` actions deduplicate by key; `acknowledgeRestockOrders(event_id, acks[])` updates order status in-place. Charts via `recharts`, maps via `react-leaflet` (`@types/leaflet` installed). animation via `framer-motion`.
+- React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`) — types: `TelemetryEvent`, `AgentAction` (includes `event_id?`, `stage?`), `FlashDeal`, `RestockBatch`, `RestockOrder` (includes `ack_at?`), `RestockAck`, `PendingApproval`, `VerificationInfo`; all `addX` actions deduplicate by key; `acknowledgeRestockOrders(event_id, acks[])` updates order status in-place; `verifications` is an `event_id → VerificationInfo` map fed by `addVerification` (keeps the highest `replan_count` per event). Charts via `recharts`, maps via `react-leaflet` (`@types/leaflet` installed), animation via `framer-motion`.
+- **Vite build is chunk-split** (`vite.config.ts` `manualChunks`): `recharts`→`charts`, `leaflet`/`react-leaflet`→`map`, `framer-motion`→`motion`. `StadiumMap` is `React.lazy`-loaded behind a `Suspense` fallback so leaflet isn't in the initial bundle. Main app chunk is ~272 kB (down from a single 905 kB bundle).
 - `pages/Dashboard.tsx` — live control room. WebSocket opened once via `useEffect([], [])` — **critical**: WS message handler reads store via `useStore.getState()` (not closure capture) to avoid stale references and prevent React 19 Strict Mode from spawning duplicate connections. `destroyed` + `ws !== currentWs` guards prevent stale `onclose` from reconnecting after component remounts. Handles: `telemetry`, `agent_action`, `flash_deal`, `restock_orders`, `approval_needed`, `approval_resolved`, `restock_ack`.
 - Backend base URL read from `VITE_API_BASE` env var (default `http://localhost:8000`). Set in `frontend/.env`. WS URL derived by replacing `http` → `ws`.
 - **`DemoControls`** — "Run Demo" fires `POST /api/v1/events/demo` (scripted 5-event cascade with live status label); "Trigger Surge" fires a single `crowd_surge`.
-- **`EventTimeline`** — full-width panel (row 2, `h-[380px]`) between the analytics grid and the bottom panels. Groups all `agent_action` messages by `event_id` into horizontally-scrollable event cards, each showing all 8 pipeline stages in order with stage-colored dots and live completion badge ("N/7" → "done").
+- **`EventTimeline`** — full-width panel (row 2, `h-[380px]`) between the analytics grid and the bottom panels. Groups all `agent_action` messages by `event_id` into horizontally-scrollable event cards, each showing all 8 pipeline stages in order with stage-colored dots and live completion badge ("N/7" → "done"). Each card header also shows a **RAG verification badge** from the `verifications` store map: `⑤ feasible` (indigo) or `⑤ ↻N` (amber, N self-corrections) with a tooltip of the constraint/correction detail.
 - **`CampaignsPanel`** — streams flash deals from `flash_deal` WS messages (headline, discount%, zone, vendor, drafted_by).
 - **`RestockPanel`** — streams B2B restock order batches; each order shows a live status badge: pulsing "ordered" → solid "✓ acked" when `restock_ack` arrives (8–20 s after dispatch).
 - **`ApprovalQueue`** — shows `PENDING_APPROVAL` actions with live Approve/Reject buttons wired to `POST /api/v1/approvals/{event_id}`; auto-clears on `approval_resolved`.
@@ -101,6 +102,10 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 
 ### Demo scenario (`backend/app/simulator/demo.py`)
 `run_demo_scenario()`: 5-event scripted cascade (~50s total): normal_flow → congestion → crowd_surge (South Gate — road closure triggers RAG self-correction) → security_alert → recovery. Each event has SoFi Stadium lat/lon. All random events from `simulator/events.py` also now include lat/lon so the ADK vendor-search tool always has coordinates.
+
+### Deployment
+- **Backend** — `backend/Dockerfile` (python:3.13-slim, installs `requirements.txt`, runs `uvicorn app.main:app` honoring Cloud Run's `$PORT`). Build from the `backend/` dir; `.dockerignore` excludes `venv/`, tests, `.env`. The ML model is intentionally *not* baked in — `SurgePredictor` falls back to the heuristic if `models/surge_predictor.joblib` is absent. Ready for `gcloud run deploy` once M9 lands.
+- **Frontend** — `frontend/vercel.json` (Vite framework preset, SPA rewrite to `/index.html`). Set `VITE_API_BASE` to the deployed backend URL in the Vercel project's env vars (see `frontend/.env.example`). Ready for Vercel once M10 lands.
 
 ## Known issues / tech debt
 - **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).

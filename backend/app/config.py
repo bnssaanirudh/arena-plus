@@ -1,8 +1,10 @@
 import os
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")
+
     PROJECT_NAME: str = "ArenaPulse"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
@@ -53,8 +55,5 @@ class Settings(BaseSettings):
     
     # Paths
     DATA_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
-    
-    class Config:
-        case_sensitive = True
 
 settings = Settings()

@@ -83,8 +83,8 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [ ] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — needs live creds
 
 ### 1.5 Hosted project URL
-- [ ] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render)
-- [ ] 1.5.2 Deploy **frontend** (Vercel / Firebase Hosting) with `VITE_API_BASE` → deployed backend
+- [~] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render). `backend/Dockerfile` + `.dockerignore` ready (python:3.13-slim, `$PORT`-aware uvicorn); just needs `gcloud run deploy` once M9 lands.
+- [~] 1.5.2 Deploy **frontend** (Vercel / Firebase Hosting) with `VITE_API_BASE` → deployed backend. `frontend/vercel.json` (SPA rewrite + Vite preset) ready; set `VITE_API_BASE` in Vercel env once M10 lands.
 - [ ] 1.5.3 Decide whether Elastic + Gemini run live in prod or in a scripted-demo mode (manage trial-credit/key exposure)
 - [ ] 1.5.4 Smoke-test the deployed URL end-to-end (surge → agent → MCP → action visible on dashboard)
 

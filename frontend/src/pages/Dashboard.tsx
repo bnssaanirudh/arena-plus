@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { StadiumMap } from '../components/StadiumMap';
 import { LiveFeed } from '../components/LiveFeed';
 import { AgentPanel } from '../components/AgentPanel';
 import { Analytics } from '../components/Analytics';
@@ -10,6 +9,11 @@ import { RestockPanel } from '../components/RestockPanel';
 import { ApprovalQueue } from '../components/ApprovalQueue';
 import { EventTimeline } from '../components/EventTimeline';
 import { useStore } from '../store/useStore';
+
+// Leaflet + react-leaflet are heavy — split into their own chunk and load lazily.
+const StadiumMap = lazy(() =>
+  import('../components/StadiumMap').then((m) => ({ default: m.StadiumMap })),
+);
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 const WS_URL = API_BASE.replace(/^http/, 'ws') + '/api/v1/ws/dashboard';
@@ -55,6 +59,7 @@ export default function Dashboard() {
             case 'approval_needed':   s.addApproval(d); break;
             case 'approval_resolved': s.resolveApproval(d.event_id as string); break;
             case 'restock_ack':       s.acknowledgeRestockOrders(d.event_id as string, d.acks); break;
+            case 'verification':      s.addVerification(d); break;
           }
         } catch (e) {
           console.error('Failed to parse WS message', e);
@@ -142,7 +147,9 @@ export default function Dashboard() {
       >
         {/* Shifting the map container down so it doesn't overlap with the absolute header */}
         <div className="absolute top-28 inset-x-0 bottom-0 z-0 opacity-80">
-          <StadiumMap />
+          <Suspense fallback={<div className="w-full h-full bg-[#111] animate-pulse" />}>
+            <StadiumMap />
+          </Suspense>
         </div>
         
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/60 pointer-events-none z-10"></div>
