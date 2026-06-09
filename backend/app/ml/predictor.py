@@ -1,8 +1,21 @@
 """
-ArenaPulse Runtime Predictor
-==============================
-Loads the trained crowd-surge model from disk and provides a prediction
-interface that the PerceptionAgent can call.
+ArenaPulse ML Pre-filter
+=========================
+Fast triage layer that converts raw telemetry into a risk context signal.
+The signal is fed to the Gemini reasoning layer (PerceptionAgent Stage 2)
+rather than used as a final prediction.
+
+**Why "pre-filter" and not "predictor"?**
+The trained model (XGBoost/RF) expects 53 archival time-series features.
+Live simulator events carry only 4 fields (event_type, location,
+density_score, predicted_people), so runtime feature coverage is always
+< 20 % and the model auto-falls back to the density heuristic.  The
+heuristic is the honest runtime path; the trained model is an accurate
+offline artifact that becomes more useful if richer telemetry (historical
+lagged features) is ever wired up.  Either way, this module's job is to
+produce a fast first-pass risk estimate — *not* to be the final answer.
+The Gemini perception layer takes this signal and performs the real
+multi-factor reasoning.
 """
 
 from pathlib import Path
@@ -53,8 +66,18 @@ _MIN_COVERAGE_THRESHOLD = 0.20
 
 class SurgePredictor:
     """
-    Loads the trained ML model and exposes predict_surge() for real-time use.
-    Falls back to a heuristic if no model file is found.
+    Fast triage pre-filter for the Perception pipeline.
+
+    Produces a quick risk-level + probability estimate from raw telemetry so
+    the Gemini reasoning layer has a structured starting point.  The output
+    is *context for Gemini*, not a final answer.
+
+    Two internal paths:
+      A. Trained model  — used when feature coverage ≥ 20 % (offline evaluation,
+                          richer future telemetry)
+      B. Density heuristic — the honest runtime path today; live events give
+                             < 20 % coverage of the 53 model features
+    Either path returns the same dict shape so callers are unaffected.
     """
 
     def __init__(self, model_path: Optional[Path] = None):
@@ -109,18 +132,23 @@ class SurgePredictor:
 
     def predict_surge(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Predict whether a crowd surge is likely to occur in the NEXT 20 MINUTES.
+        Run the fast pre-filter on a raw telemetry event.
 
         Accepts the raw live telemetry event dict (density_score, predicted_people,
-        event_type, location). Internally adapts it to the model's feature space.
-        Falls back to heuristic when feature coverage is too low.
+        event_type, location). Internally adapts it to the model's feature space
+        and falls back to the density heuristic when coverage is too low (< 20 %,
+        which is always the case for today's simulator events).
+
+        The returned dict is used as *context* by PerceptionAgent before passing
+        to Gemini — not as the final risk verdict.
 
         Returns
         -------
         dict with:
-            - risk_level  : str   (LOW, MEDIUM, HIGH, CRITICAL)
-            - probability : float (0-1, confidence of surge)
-            - model_used  : str   (name of model or "heuristic_fallback")
+            - risk_level  : str   (LOW, MEDIUM, HIGH, CRITICAL) — fast estimate
+            - probability : float (0-1, surge likelihood)
+            - model_used  : str   ("heuristic_fallback" at runtime; trained model
+                                   name if feature coverage is ever ≥ 20 %)
         """
         if not self._loaded or self.model is None:
             return self._heuristic_fallback(features)

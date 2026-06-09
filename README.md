@@ -6,35 +6,72 @@ ArenaPulse is an **autonomous multi-agent system** for large-scale events (FIFA 
 >
 > 📋 Build status, phases, and the manual setup steps live in **[`HACKATHON_PLAN.md`](HACKATHON_PLAN.md)**. The product vision is in **[`project_idea.md`](project_idea.md)**.
 
-## The agent mission (multi-step, non-linear)
+## Agent architecture
 
 ```
-[Crowd surge detected]
-   → Perceive    risk (ML pre-filter + Gemini 3 reasoning)
-   → Plan        the intervention (Gemini decides action + resources)
-   → Source      nearest low-stock vendors (Elastic MCP)
-   → Verify      supply-chain feasibility (RAG); self-correct if not viable
-   → Execute     ┌─ dispatch B2B restock orders
-                 └─ generate & push hyper-local flash deals to fans
+  Live crowd telemetry (5 s tick)
+           │
+     ┌─────▼──────────┐
+     │   Simulator    │  density · crowd count · zone · lat/lon
+     └─────┬──────────┘
+           │ pub/sub (in-memory async)
+           ▼
+  ╔════════════════════╗
+  ║  ① Perception      ║  ML pre-filter → Gemini 3 multi-factor reasoning
+  ║                    ║  → risk_level : LOW / MEDIUM / HIGH / CRITICAL
+  ╚════════╤═══════════╝
+           │
+  ╔════════▼═══════════╗         ┌──────────────────────────────┐
+  ║  ② Planning        ║────────▶│  ADK LlmAgent (google-adk)   │
+  ║                    ║◀────────│  model: Gemini 3             │
+  ╚════════╤═══════════╝         │  tool:  find_nearby_vendors  │◀─ Elastic MCP
+           │                     └──────────────────────────────┘
+           │  action · resources · target zone
+           ▼
+  ╔════════════════════╗
+  ║  ③ Inventory       ║  allocate nearest in-stock vendors (geo-search)
+  ╚════════╤═══════════╝
+           │
+  ╔════════▼═══════════╗
+  ║  ④ Validation      ║  resource-sufficiency check → VALID / INVALID
+  ╚════════╤═══════════╝
+           │
+  ╔════════▼═══════════╗  feasible?
+  ║  ⑤ Verification    ║──── NO ──▶ inject correction → re-run ②③④
+  ║   (RAG loop)       ║            max 2 self-correction replans
+  ╚════════╤═══════════╝
+           │ YES
+    high-impact?
+           │ YES
+     ┌─────▼────────────┐
+     │  ⑥ Human Gate    │  POST /api/v1/approvals/{event_id}
+     │  Approve/Reject  │  ApprovalQueue panel (live dashboard)
+     └─────┬────────────┘
+           │ approved (or auto if low-impact)
+           ▼
+  ╔════════════════════╗
+  ║  ⑦ Execution       ║  dispatch resources · B2B restock orders (PO-xxxx)
+  ╚════════╤═══════════╝
+           │
+  ╔════════▼═══════════╗
+  ║  ⑧ Marketing       ║  Gemini drafts hyper-local flash deal
+  ║                    ║  zone · item · vendor · 30-min window
+  ╚════════╤═══════════╝
+           │ WebSocket  /api/v1/ws/dashboard
+           ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  Live Dashboard  (React 19 · Vite · Tailwind v4 · Zustand)  │
+  │  Leaflet map · AgentPanel · ApprovalQueue                   │
+  │  CampaignsPanel (flash deals) · RestockPanel (restock POs)  │
+  └─────────────────────────────────────────────────────────────┘
 ```
 
-The human stays in control: high-impact actions (evacuation, large dispatch) route through an approval gate.
-
-## Architecture
-
-**Backend (`backend/`, FastAPI + Python)**
-- **Simulator** (`simulator/engine.py`) — emits a telemetry event every few seconds and runs it through the agent.
-- **Agent pipeline** (`agents/`) — Perception → Planning → Inventory → Validation → [human approval gate] → Execution → Marketing, each stage published to a pub/sub channel.
-  - **Gemini 3** (`llm/gemini.py`) is the reasoning brain. The planning decision runs through a real **Google ADK** `LlmAgent` (`adk_agent.py`) that can autonomously call the **Elastic** vendor-search tool — falling back to direct Gemini, then a deterministic heuristic.
-  - **Execution** emits structured B2B restock orders; the **MarketingAgent** drafts autonomous hyper-local flash deals — the commerce half of the mission.
-  - **Human-in-the-loop**: high-impact actions pause for approval (`POST /api/v1/approvals/{event_id}`) when `APPROVAL_REQUIRED` is set.
-  - **Elastic MCP** is the agent's data superpower (vendor/inventory/geo search + RAG).
-- **Pub/sub** (`infra/`) — in-memory async mock Redis; no real Redis needed.
-- **WebSocket** (`routers/websockets.py`) — `/api/v1/ws/dashboard` multiplexes telemetry + all agent stages to the browser.
-- **Observability** (`observability/tracer.py`) — Arize Phoenix + OpenTelemetry traces of the agent's reasoning.
-
-**Frontend (`frontend/`, React 19 + Vite + Tailwind v4 + TypeScript)**
-- Live **Dashboard**: Leaflet stadium map, telemetry feed, analytics, and an agent-activity panel — wired to the WebSocket via Zustand.
+| Hackathon pillar | Where it lives |
+|---|---|
+| **Gemini 3** (google-genai) | Perception (risk reasoning), Planning (decision), Marketing (flash deal copy) |
+| **Google ADK** (google-adk) | `adk_agent.py` — real `LlmAgent` that autonomously calls the Elastic tool |
+| **Elastic MCP** (partner track) | `find_nearby_vendors` FunctionTool; RAG constraint retrieval in Verification |
+| **Arize Phoenix** | OpenTelemetry traces of every Gemini + MCP call |
 
 ### Graceful degradation (design principle — preserve it)
 Runs with **nothing external configured**: mock Redis always; Elastic, Gemini, and the trained ML model are all optional with built-in fallbacks. Credentials simply upgrade the system from "fallback" to "full".
