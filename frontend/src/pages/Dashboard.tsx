@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StadiumMap } from '../components/StadiumMap';
 import { LiveFeed } from '../components/LiveFeed';
@@ -18,80 +18,69 @@ const RECONNECT_MAX_MS = 30000;
 type WsStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
 export default function Dashboard() {
-  const { addEvent, addAgentAction, addFlashDeal, addRestockBatch, addApproval, resolveApproval } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
-  const wsRef = useRef<WebSocket | null>(null);
-  const retryDelayRef = useRef(RECONNECT_BASE_MS);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const unmountedRef = useRef(false);
 
   useEffect(() => {
-    unmountedRef.current = false;
+    let destroyed = false;
+    let currentWs: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = RECONNECT_BASE_MS;
 
     function connect() {
-      if (unmountedRef.current) return;
+      if (destroyed) return;
       setWsStatus('connecting');
 
       const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
+      currentWs = ws;
 
       ws.onopen = () => {
-        retryDelayRef.current = RECONNECT_BASE_MS;
+        retryDelay = RECONNECT_BASE_MS;
         setWsStatus('live');
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = (ev) => {
         try {
-          const payload = JSON.parse(event.data);
+          const payload = JSON.parse(ev.data as string);
+          // Read store actions at call time — no stale closure captures
+          const s = useStore.getState();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const d = payload.data as any;
           switch (payload.type) {
-            case 'telemetry':
-              addEvent(payload.data);
-              break;
-            case 'agent_action':
-              addAgentAction(payload.data);
-              break;
-            case 'flash_deal':
-              addFlashDeal(payload.data);
-              break;
-            case 'restock_orders':
-              addRestockBatch(payload.data);
-              break;
-            case 'approval_needed':
-              addApproval(payload.data);
-              break;
-            case 'approval_resolved':
-              resolveApproval(payload.data.event_id);
-              break;
+            case 'telemetry':         s.addEvent(d); break;
+            case 'agent_action':      s.addAgentAction(d); break;
+            case 'flash_deal':        s.addFlashDeal(d); break;
+            case 'restock_orders':    s.addRestockBatch(d); break;
+            case 'approval_needed':   s.addApproval(d); break;
+            case 'approval_resolved': s.resolveApproval(d.event_id as string); break;
           }
         } catch (e) {
-          console.error('Failed to parse websocket message', e);
+          console.error('Failed to parse WS message', e);
         }
       };
 
       ws.onclose = () => {
-        if (unmountedRef.current) return;
+        // Guard: only reconnect if this WS is still current AND we're not destroyed
+        if (destroyed || ws !== currentWs) return;
         setWsStatus('reconnecting');
-        retryTimerRef.current = setTimeout(() => {
-          retryDelayRef.current = Math.min(retryDelayRef.current * 2, RECONNECT_MAX_MS);
+        retryTimer = setTimeout(() => {
+          retryDelay = Math.min(retryDelay * 2, RECONNECT_MAX_MS);
           connect();
-        }, retryDelayRef.current);
+        }, retryDelay);
       };
 
-      ws.onerror = () => {
-        ws.close();
-      };
+      ws.onerror = () => ws.close();
     }
 
     connect();
 
     return () => {
-      unmountedRef.current = true;
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      wsRef.current?.close();
+      destroyed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      currentWs?.close();
       setWsStatus('offline');
     };
-  }, [addEvent, addAgentAction, addFlashDeal, addRestockBatch, addApproval, resolveApproval]);
+  }, []); // stable — store read via useStore.getState() inside handler
 
   const statusColor: Record<WsStatus, string> = {
     live: 'bg-green-500',
@@ -182,14 +171,14 @@ export default function Dashboard() {
         <h2 className="text-4xl lg:text-5xl font-black uppercase mb-8 tracking-tight shrink-0">System Status</h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
+          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col h-[500px] lg:h-[650px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-slate-400 shrink-0">Global Analytics</h3>
             <div className="flex-1 min-h-0">
               <Analytics />
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col min-h-[500px] lg:h-[650px]">
+          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col h-[500px] lg:h-[650px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-orange-500 shrink-0">Active Agents</h3>
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
               <AgentPanel />
@@ -199,8 +188,7 @@ export default function Dashboard() {
 
         {/* Second row — Approval Queue + Campaigns + Restock */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-          {/* Approval Queue — full width when items present, collapses otherwise */}
-          <div className="lg:col-span-4 bg-red-950/30 border border-red-800/40 p-6 flex flex-col min-h-[300px]">
+          <div className="lg:col-span-4 bg-red-950/30 border border-red-800/40 p-6 flex flex-col h-[400px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-red-400 shrink-0 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
               Approval Queue
@@ -210,7 +198,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#0a1628] border border-blue-900/40 p-6 flex flex-col min-h-[300px]">
+          <div className="lg:col-span-4 bg-[#0a1628] border border-blue-900/40 p-6 flex flex-col h-[400px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-blue-400 shrink-0 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
               Autonomous Campaigns
@@ -220,7 +208,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#0f1a0f] border border-green-900/40 p-6 flex flex-col min-h-[300px]">
+          <div className="lg:col-span-4 bg-[#0f1a0f] border border-green-900/40 p-6 flex flex-col h-[400px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-green-400 shrink-0 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               B2B Restock Orders

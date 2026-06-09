@@ -78,18 +78,25 @@ export const useStore = create<AppState>((set) => ({
   pendingApprovals: [],
   isDemoMode: false,
 
-  addEvent: (event) => set((state) => ({
-    liveEvents: [event, ...state.liveEvents].slice(0, 50),
-  })),
-  addAgentAction: (action) => set((state) => ({
-    agentActions: [action, ...state.agentActions].slice(0, 50),
-  })),
-  addFlashDeal: (deal) => set((state) => ({
-    flashDeals: [deal, ...state.flashDeals].slice(0, 20),
-  })),
-  addRestockBatch: (batch) => set((state) => ({
-    restockBatches: [batch, ...state.restockBatches].slice(0, 20),
-  })),
+  addEvent: (event) => set((state) => {
+    // Deduplicate by event_id — guards against double WS connections
+    if (state.liveEvents.some((e) => e.event_id === event.event_id)) return state;
+    return { liveEvents: [event, ...state.liveEvents].slice(0, 50) };
+  }),
+  addAgentAction: (action) => set((state) => {
+    // Deduplicate by agent_name + timestamp — same message from two sockets
+    const key = `${action.agent_name}\x00${action.timestamp}\x00${action.action}`;
+    if (state.agentActions.some((a) => `${a.agent_name}\x00${a.timestamp}\x00${a.action}` === key)) return state;
+    return { agentActions: [action, ...state.agentActions].slice(0, 100) };
+  }),
+  addFlashDeal: (deal) => set((state) => {
+    if (state.flashDeals.some((d) => d.event_id === deal.event_id)) return state;
+    return { flashDeals: [deal, ...state.flashDeals].slice(0, 20) };
+  }),
+  addRestockBatch: (batch) => set((state) => {
+    if (state.restockBatches.some((b) => b.event_id === batch.event_id)) return state;
+    return { restockBatches: [batch, ...state.restockBatches].slice(0, 20) };
+  }),
   addApproval: (approval) => set((state) => ({
     // Deduplicate by event_id
     pendingApprovals: state.pendingApprovals.some(a => a.event_id === approval.event_id)

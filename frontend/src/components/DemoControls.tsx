@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Play, Square, FastForward, Clapperboard } from 'lucide-react';
+import { FastForward, Clapperboard } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
 export function DemoControls() {
-    const { isDemoMode, setDemoMode } = useStore();
+    const { setDemoMode } = useStore();
     const [triggering, setTriggering] = useState(false);
     const [demoRunning, setDemoRunning] = useState(false);
     const [demoStatus, setDemoStatus] = useState('');

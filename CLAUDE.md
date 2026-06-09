@@ -90,7 +90,7 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 
 ### Frontend (`frontend/src/`)
 - React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`, no config file) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`). Charts via `recharts`, maps via `react-leaflet`, animation via `framer-motion`.
-- `pages/Dashboard.tsx` — live control room. Opens WebSocket with exponential-backoff reconnect (1s→30s); shows Live/Reconnecting/Offline badge. Feeds Zustand store.
+- `pages/Dashboard.tsx` — live control room. WebSocket opened once via `useEffect([], [])` — **critical**: WS message handler reads store via `useStore.getState()` (not closure capture) to avoid stale references and prevent React 19 Strict Mode from spawning duplicate connections. `destroyed` + `ws !== currentWs` guards prevent stale `onclose` from reconnecting after component remounts.
 - Backend base URL read from `VITE_API_BASE` env var (default `http://localhost:8000`). Set in `frontend/.env`. WS URL derived by replacing `http` → `ws`.
 - **`DemoControls`** — "Run Demo" fires `POST /api/v1/events/demo` (scripted 5-event cascade with live status label); "Trigger Surge" fires a single `crowd_surge`.
 - **`CampaignsPanel`** — streams flash deals from `flash_deal` WS messages (headline, discount%, zone, vendor, drafted_by).
@@ -104,8 +104,8 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 ## Known issues / tech debt
 - **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).
 - **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic call when ES creds land.
-- **ML model story** — `SurgePredictor` runs at <20% coverage so always falls back to heuristic. Needs reframe as "fast pre-filter" (HACKATHON_PLAN 4.1) or retraining.
-- **`tsc` build errors** — `StadiumMap.tsx`, `Landing.tsx`, `Operations.tsx`, `Analytics.tsx`, `LiveFeed.tsx` have pre-existing TS errors. Vite dev server works fine; `npm run build` fails on these. Fix before deploy.
+- **`tsc` build errors** — `StadiumMap.tsx`, `Analytics.tsx` have pre-existing TS errors (7 total). Vite dev server works fine; `npm run build` fails on these files only. Fix before deploy.
+- **Zustand store dedup** — `addAgentAction`, `addEvent`, `addFlashDeal`, `addRestockBatch` all deduplicate by key (agent+timestamp, event_id) as defense against any future double-WS edge cases.
 
 ## Knowledge graph (code-review-graph MCP)
 
