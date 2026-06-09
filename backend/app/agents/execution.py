@@ -6,7 +6,9 @@ Supports DRY_RUN mode for testing without side effects.
 Logs all execution decisions to the pub/sub system.
 """
 
+import asyncio
 import json
+import random
 import uuid
 from datetime import datetime, timezone
 from loguru import logger
@@ -14,6 +16,7 @@ from loguru import logger
 from ..config import settings
 from ..mcp.tools import MCPTools
 from ..infra.mock_redis import mock_redis
+from ..infra.pubsub import pubsub, Channels
 
 # Which supplier refills which item (B2B restock routing).
 _SUPPLIER_BY_ITEM = {
@@ -44,6 +47,30 @@ def _build_restock_orders(allocations: list) -> list:
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 })
     return orders
+
+
+async def schedule_supplier_acks(orders: list, event_id: str) -> None:
+    """Simulate supplier-side acknowledgement of restock orders.
+
+    Waits a random 8–20 s delay (mimicking supplier latency) then publishes
+    acknowledgements for each order. Published on AGENT_RESTOCK_ACK so the
+    dashboard can update order status badges from ORDERED → ACKNOWLEDGED.
+    """
+    if not orders:
+        return
+    delay = random.uniform(8, 20)
+    await asyncio.sleep(delay)
+    ack_at = datetime.now(timezone.utc).isoformat()
+    acks = [
+        {"order_id": o["order_id"], "status": "ACKNOWLEDGED", "ack_at": ack_at}
+        for o in orders
+    ]
+    await pubsub.publish(Channels.AGENT_RESTOCK_ACK, {
+        "event_id": event_id,
+        "acks": acks,
+        "ack_at": ack_at,
+    })
+    logger.info(f"📦 Supplier ACK sent for {len(acks)} order(s) on event {event_id}")
 
 
 class ExecutionAgent:

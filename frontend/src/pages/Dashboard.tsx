@@ -8,6 +8,7 @@ import { DemoControls } from '../components/DemoControls';
 import { CampaignsPanel } from '../components/CampaignsPanel';
 import { RestockPanel } from '../components/RestockPanel';
 import { ApprovalQueue } from '../components/ApprovalQueue';
+import { EventTimeline } from '../components/EventTimeline';
 import { useStore } from '../store/useStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
@@ -53,6 +54,7 @@ export default function Dashboard() {
             case 'restock_orders':    s.addRestockBatch(d); break;
             case 'approval_needed':   s.addApproval(d); break;
             case 'approval_resolved': s.resolveApproval(d.event_id as string); break;
+            case 'restock_ack':       s.acknowledgeRestockOrders(d.event_id as string, d.acks); break;
           }
         } catch (e) {
           console.error('Failed to parse WS message', e);
@@ -186,7 +188,21 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Second row — Approval Queue + Campaigns + Restock */}
+        {/* Second row — Agent Reasoning Timeline (full width) */}
+        <div className="mt-8 bg-[#0b0b0b] border border-white/10 p-6 flex flex-col h-[380px]">
+          <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-white shrink-0 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+            Agent Reasoning Timeline
+            <span className="ml-2 text-xs font-normal text-slate-500 normal-case tracking-normal">
+              per-event pipeline · scroll →
+            </span>
+          </h3>
+          <div className="flex-1 min-h-0">
+            <EventTimeline />
+          </div>
+        </div>
+
+        {/* Third row — Approval Queue + Campaigns + Restock */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
           <div className="lg:col-span-4 bg-red-950/30 border border-red-800/40 p-6 flex flex-col h-[400px]">
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-red-400 shrink-0 flex items-center gap-2">

@@ -5,7 +5,7 @@ export function Analytics() {
     const { liveEvents } = useStore();
 
     // Group events by minute for the chart
-    const data = liveEvents.slice(0, 20).reverse().map((e, i) => ({
+    const data = liveEvents.slice(0, 20).reverse().map((e) => ({
         time: new Date(e.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         density: e.density_score,
         people: e.predicted_people

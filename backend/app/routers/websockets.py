@@ -39,6 +39,7 @@ async def websocket_dashboard(websocket: WebSocket):
         Channels.AGENT_VERIFICATION,
         Channels.AGENT_EXECUTION,
         Channels.AGENT_MARKETING,
+        Channels.AGENT_RESTOCK_ACK,
     ]
 
     queues = []
@@ -180,6 +181,18 @@ async def websocket_dashboard(websocket: WebSocket):
                     }
                 })
 
+            elif channel == Channels.AGENT_RESTOCK_ACK:
+                # Supplier acknowledged restock orders — forward directly, no agent_action needed
+                await websocket.send_json({
+                    "type": "restock_ack",
+                    "data": {
+                        "event_id": data.get("event_id"),
+                        "acks": data.get("acks", []),
+                        "ack_at": data.get("ack_at"),
+                    }
+                })
+                continue
+
             elif channel == Channels.AGENT_PIPELINE:
                 stage = data.get("stage", "")
                 action_text = f"Pipeline {stage}"
@@ -191,7 +204,18 @@ async def websocket_dashboard(websocket: WebSocket):
                         "data": {"event_id": data.get("event_id"), "result": data.get("result")}
                     })
 
-            # Always send the agent_action for AgentPanel
+            # Channel → pipeline stage name (used by EventTimeline frontend)
+            _STAGE_NAME = {
+                Channels.AGENT_PIPELINE:     "pipeline",
+                Channels.AGENT_PERCEPTION:   "perception",
+                Channels.AGENT_PLANNING:     "planning",
+                Channels.AGENT_INVENTORY:    "inventory",
+                Channels.AGENT_VALIDATION:   "validation",
+                Channels.AGENT_VERIFICATION: "verification",
+                Channels.AGENT_EXECUTION:    "execution",
+                Channels.AGENT_MARKETING:    "marketing",
+            }
+            # Always send the agent_action for AgentPanel + EventTimeline
             await websocket.send_json({
                 "type": "agent_action",
                 "data": {
@@ -199,6 +223,8 @@ async def websocket_dashboard(websocket: WebSocket):
                     "action": action_text,
                     "reasoning": reasoning,
                     "timestamp": timestamp,
+                    "event_id": data.get("event_id"),
+                    "stage": _STAGE_NAME.get(channel, channel),
                 }
             })
             # Send any additional rich-typed messages

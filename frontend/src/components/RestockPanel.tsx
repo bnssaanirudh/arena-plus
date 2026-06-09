@@ -8,13 +8,24 @@ const ITEM_COLOR: Record<string, string> = {
 
 function OrderRow({ order }: { order: RestockOrder }) {
   const color = ITEM_COLOR[order.item] ?? 'text-green-300';
+  const acked = order.status === 'ACKNOWLEDGED';
   return (
     <div className="flex items-center gap-2 text-xs py-1.5 border-b border-green-900/30 last:border-0">
       <span className="font-mono text-green-600 w-24 shrink-0">{order.order_id}</span>
       <span className={`font-semibold uppercase w-12 shrink-0 ${color}`}>{order.item}</span>
       <span className="text-green-300 w-10 shrink-0 text-right">{order.quantity}</span>
       <span className="text-green-500 truncate flex-1" title={order.vendor_name}>{order.vendor_name}</span>
-      <span className="text-green-700 truncate max-w-[7rem]" title={order.supplier}>→ {order.supplier}</span>
+      {/* Status badge — updates live when supplier acks */}
+      <span
+        className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+          acked
+            ? 'bg-green-900/60 text-green-400'
+            : 'bg-yellow-900/40 text-yellow-500 animate-pulse'
+        }`}
+        title={acked ? `Acked at ${order.ack_at}` : 'Awaiting supplier acknowledgement'}
+      >
+        {acked ? '✓ acked' : 'ordered'}
+      </span>
     </div>
   );
 }

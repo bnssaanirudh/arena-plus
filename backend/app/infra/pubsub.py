@@ -30,6 +30,7 @@ class Channels:
     AGENT_MARKETING = "agent.marketing"  # autonomous flash-deal campaigns
     AGENT_VERIFICATION = "agent.verification"  # RAG feasibility check + self-correction
     AGENT_PIPELINE = "agent.pipeline"  # aggregated pipeline status
+    AGENT_RESTOCK_ACK = "agent.restock_ack"  # simulated supplier acknowledgements
 
 
 # ---------------------------------------------------------------------------

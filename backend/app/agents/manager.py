@@ -20,6 +20,7 @@ waits for ``resolve_approval()`` (driven by the approvals REST endpoint) before
 executing — the "you stay in control" guarantee.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
@@ -31,7 +32,7 @@ from .planning import PlanningAgent
 from .inventory import InventoryAgent
 from .validation import ValidationAgent
 from .verification import VerificationAgent
-from .execution import ExecutionAgent
+from .execution import ExecutionAgent, schedule_supplier_acks
 from .marketing import MarketingAgent
 from ..infra.pubsub import pubsub, Channels
 
@@ -247,6 +248,11 @@ class AgentManager:
             "event_id": event_id,
             "deal": deal,
         }, source="MarketingAgent")
+
+        # Fire-and-forget: supplier ACKs arrive 8-20s later (simulates B2B latency)
+        restock_orders = execution_result.get("restock_orders", [])
+        if restock_orders:
+            asyncio.create_task(schedule_supplier_acks(restock_orders, event_id))
 
         logger.info("--- Agent Workflow Ended (EXECUTED) ---")
         await pubsub.publish(Channels.AGENT_PIPELINE, {

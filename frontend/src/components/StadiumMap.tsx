@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useStore } from '../store/useStore';
 
-const STADIUM_CENTER = [34.0141, -118.2879];
-
-// Component to recenter or adjust map dynamically if needed
-function MapUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center);
-  }, [center, map]);
-  return null;
-}
+const STADIUM_CENTER: [number, number] = [34.0141, -118.2879];
 
 export function StadiumMap() {
     const { liveEvents } = useStore();

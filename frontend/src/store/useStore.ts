@@ -9,11 +9,13 @@ interface TelemetryEvent {
   timestamp: string;
 }
 
-interface AgentAction {
+export interface AgentAction {
   agent_name: string;
   action: string;
   reasoning: string;
   timestamp: string;
+  event_id?: string;
+  stage?: string;
 }
 
 export interface FlashDeal {
@@ -39,6 +41,13 @@ export interface RestockOrder {
   supplier: string;
   status: string;
   created_at: string;
+  ack_at?: string;  // set when supplier acknowledges
+}
+
+export interface RestockAck {
+  order_id: string;
+  status: string;
+  ack_at: string;
 }
 
 export interface RestockBatch {
@@ -67,6 +76,7 @@ interface AppState {
   addRestockBatch: (batch: RestockBatch) => void;
   addApproval: (approval: PendingApproval) => void;
   resolveApproval: (event_id: string) => void;
+  acknowledgeRestockOrders: (event_id: string, acks: RestockAck[]) => void;
   setDemoMode: (val: boolean) => void;
 }
 
@@ -106,5 +116,21 @@ export const useStore = create<AppState>((set) => ({
   resolveApproval: (event_id) => set((state) => ({
     pendingApprovals: state.pendingApprovals.filter(a => a.event_id !== event_id),
   })),
+  acknowledgeRestockOrders: (event_id, acks) => set((state) => {
+    const ackMap = new Map(acks.map((a) => [a.order_id, a]));
+    return {
+      restockBatches: state.restockBatches.map((batch) =>
+        batch.event_id !== event_id
+          ? batch
+          : {
+              ...batch,
+              orders: batch.orders.map((o) => {
+                const ack = ackMap.get(o.order_id);
+                return ack ? { ...o, status: ack.status, ack_at: ack.ack_at } : o;
+              }),
+            }
+      ),
+    };
+  }),
   setDemoMode: (val) => set({ isDemoMode: val }),
 }));
