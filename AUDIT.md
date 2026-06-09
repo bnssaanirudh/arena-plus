@@ -64,13 +64,13 @@ This document lists confirmed bugs, flow breaks, and UI issues. Severity: 🔴 c
 
 ---
 
-## Dead / unused code (low priority cleanup)
-- `Channels.TELEMETRY_EVENTS = "telemetry.events"` — never published or subscribed (the simulator uses the literal `"arena:telemetry:raw"` instead).
-- `PubSubService.stream()` and `get_recent_logs()` — defined, no callers.
-- `routers/events.py` `/live` SSE + `SimulatorEngine.subscribe()/_notify_subscribers` — a second, parallel telemetry path that the dashboard does not use (the WS path is canonical). `/history` is a stub returning `[]`.
-- `validation.py` — always returns `VALID` even when a shortfall is logged; validation is effectively a pass-through.
+## Dead / unused code — ✅ all resolved (2026-06-09)
+- ~~`Channels.TELEMETRY_EVENTS`~~ — removed.
+- ~~`PubSubService.stream()` and `get_recent_logs()`~~ — removed.
+- ~~`/live` SSE + `SimulatorEngine.subscribe()/_notify_subscribers`~~ — removed; WS path is canonical.
+- ~~`validation.py` always VALID~~ — now returns `INVALID` with reason on shortfall.
 
-## Notable gaps (not bugs, but missing for "done")
-- **G1.** `GET /api/v1/events/history` is a stub (`return []`).
-- **G2.** No endpoint to manually inject/trigger an event (needed for DemoControls "Trigger Surge").
-- **G3.** `manager.process_event` indexes `event_data["location"]` directly — `KeyError` if an event ever lacks `location` (simulator always sets it today, but external callers could break it).
+## Notable gaps — ✅ all resolved (2026-06-09)
+- ~~**G1.** `GET /api/v1/events/history` stub~~ — implemented via 100-event in-memory ring buffer in `pubsub.py`.
+- ~~**G2.** No trigger endpoint~~ — `POST /api/v1/events/trigger` added.
+- ~~**G3.** `event_data["location"]` KeyError risk~~ — changed to `.get("location", "unknown")`.

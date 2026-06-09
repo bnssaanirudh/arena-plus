@@ -1,8 +1,6 @@
 import asyncio
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from pydantic import BaseModel
-from sse_starlette.sse import EventSourceResponse
-from ..simulator.engine import simulator_engine
 from ..simulator.events import generate_random_event, EVENT_TYPES
 from ..infra.pubsub import pubsub
 from ..agents.manager import agent_manager
@@ -30,18 +28,6 @@ async def trigger_event(body: TriggerEventRequest = TriggerEventRequest()):
     return {"status": "triggered", "event_id": event["event_id"], "event_type": event["event_type"]}
 
 
-@router.get("/live")
-async def live_events(request: Request):
-    """Server-Sent Events endpoint for live telemetry."""
-    async def event_generator():
-        async for event_json in simulator_engine.subscribe():
-            if await request.is_disconnected():
-                break
-            yield {"data": event_json}
-
-    return EventSourceResponse(event_generator())
-
-
 @router.get("/history")
-async def event_history() -> List[Dict[str, Any]]:
-    return []
+async def event_history(limit: int = 50) -> List[Dict[str, Any]]:
+    return pubsub.get_telemetry_history(limit=min(limit, 100))

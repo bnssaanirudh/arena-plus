@@ -12,11 +12,20 @@ class ValidationAgent:
             return {"status": "VALID", "reason": "No action to validate"}
             
         shortfall = allocation.get("shortfall", {})
-        if shortfall.get("water", 0) > 0 or shortfall.get("food", 0) > 0:
-            logger.warning(f"Validation flagged a shortfall: {shortfall}")
-            
+        water_short = shortfall.get("water", 0)
+        food_short = shortfall.get("food", 0)
+
+        if water_short > 0 or food_short > 0:
+            logger.warning(f"ValidationAgent rejected allocation — shortfall: {shortfall}")
+            return {
+                "status": "INVALID",
+                "reason": f"Insufficient inventory — water short: {water_short}, food short: {food_short}",
+                "approved_allocations": allocation.get("allocations", []),
+                "shortfall": shortfall,
+            }
+
         return {
             "status": "VALID",
             "reason": "Allocations are within available inventory",
-            "approved_allocations": allocation.get("allocations", [])
+            "approved_allocations": allocation.get("allocations", []),
         }

@@ -153,13 +153,15 @@ class TestPubSubService:
         assert "timestamp" in msg
 
     @pytest.mark.asyncio
-    async def test_recent_logs(self):
-        """get_recent_logs should return stored log entries."""
-        from app.infra.pubsub import PubSubService
+    async def test_telemetry_history(self):
+        """get_telemetry_history should return raw telemetry events newest-first."""
+        from app.infra.pubsub import PubSubService, TELEMETRY_RAW_CHANNEL
 
         svc = PubSubService()
-        await svc.publish("log.test", {"entry": 1})
-        await svc.publish("log.test", {"entry": 2})
+        await svc.publish(TELEMETRY_RAW_CHANNEL, {"event_id": "a", "density_score": 3.0})
+        await svc.publish(TELEMETRY_RAW_CHANNEL, {"event_id": "b", "density_score": 7.0})
 
-        logs = await svc.get_recent_logs("log.test", count=10)
-        assert len(logs) >= 2
+        history = svc.get_telemetry_history(limit=10)
+        assert len(history) >= 2
+        # newest first
+        assert history[0]["event_id"] == "b"

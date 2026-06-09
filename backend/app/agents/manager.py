@@ -72,7 +72,7 @@ class AgentManager:
             }
 
         # 3. Inventory / Resource Allocation
-        allocation = await self.inventory.allocate(plan, event_data["location"])
+        allocation = await self.inventory.allocate(plan, event_data.get("location", "unknown"))
         await pubsub.publish(Channels.AGENT_INVENTORY, {
             "event_id": event_id,
             "allocation": allocation,

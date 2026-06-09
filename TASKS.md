@@ -1,6 +1,6 @@
 # ArenaPulse — Task List
 
-_Living checklist. Keep updated: `[ ]` pending · `[~]` in progress · `[x]` done. Last updated: 2026-06-09._
+_Living checklist. Keep updated: `[ ]` pending · `[~]` in progress · `[x]` done. Last updated: 2026-06-09. All tasks complete._
 
 Legend: 🔴 critical · 🟠 major · 🟡 minor · 🧹 cleanup · ➕ gap/feature
 
@@ -55,16 +55,16 @@ Trigger Surge has no handler; Demo Mode toggles unused state. (AUDIT M3)
 - [x] 8.3 Fix README Windows-only `venv/Scripts/activate` line
 - [x] 8.4 Link `AUDIT.md` + `TASKS.md` from README
 
-## 9. ➕ Fill functional gaps — _status: [~] partial_
-- [ ] 9.1 Implement `GET /api/v1/events/history` (read from ES log or in-memory ring buffer) (AUDIT G1)
+## 9. ➕ Fill functional gaps — _status: [x] done_
+- [x] 9.1 `GET /api/v1/events/history` — 100-event in-memory ring buffer in `pubsub.py`; newest-first; `?limit=` param
 - [x] 9.2 `POST /api/v1/events/trigger` implemented (unblocked task 5)
-- [ ] 9.3 Harden `manager.process_event` against missing `event_data["location"]` (AUDIT G3)
+- [x] 9.3 Harden `manager.process_event` — `event_data.get("location", "unknown")` prevents KeyError
 
-## 10. 🧹 Dead-code cleanup — _status: [ ] pending_
-- [ ] 10.1 Remove unused `Channels.TELEMETRY_EVENTS`
-- [ ] 10.2 Remove or use `PubSubService.stream()` / `get_recent_logs()`
-- [ ] 10.3 Decide fate of legacy SSE path (`events.py /live`, `SimulatorEngine.subscribe`)
-- [ ] 10.4 Make `ValidationAgent` actually reject on shortfall (or document pass-through intent)
+## 10. 🧹 Dead-code cleanup — _status: [x] done_
+- [x] 10.1 Removed unused `Channels.TELEMETRY_EVENTS`
+- [x] 10.2 Removed `PubSubService.stream()` and `get_recent_logs()` (no callers)
+- [x] 10.3 Removed legacy SSE path (`events.py /live`, `SimulatorEngine.subscribe/_notify_subscribers`)
+- [x] 10.4 `ValidationAgent` now returns `INVALID` + reason when inventory shortfall detected
 
 ---
 

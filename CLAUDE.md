@@ -46,7 +46,7 @@ Run from `backend/`. The trained model lands in the top-level `models/` dir (not
 ### Backend data flow (the core loop)
 1. **`simulator/engine.py`** (`SimulatorEngine`) — on startup (`SIMULATION_ACTIVE=True`), loops every `SIMULATION_INTERVAL_SECONDS` (default 5s). Each tick generates a random telemetry event, publishes it to the `arena:telemetry:raw` channel, and fires `agent_manager.process_event(event)` as a background task.
 2. **`agents/manager.py`** (`AgentManager`) — a fixed state machine: **Perception → Planning → Inventory → Validation → Execution**. It publishes the intermediate result of each stage to a dedicated pub/sub channel. The pipeline short-circuits and returns early if Planning decides `MONITOR`.
-3. **`infra/pubsub.py`** (`pubsub`) — thin JSON+timestamp layer over **`infra/mock_redis.py`** (an in-memory async fake Redis). Channel names live in the `Channels` class. Every publish also `lpush`es to a `log:<channel>` list for replay via `get_recent_logs`.
+3. **`infra/pubsub.py`** (`pubsub`) — thin JSON+timestamp layer over **`infra/mock_redis.py`** (an in-memory async fake Redis). Channel names live in the `Channels` class. Raw telemetry events are kept in a 100-event in-memory ring buffer (`_telemetry_history`) served by `GET /api/v1/events/history`.
 4. **`routers/websockets.py`** — `/api/v1/ws/dashboard` subscribes to the raw telemetry channel + all agent channels, multiplexes them into one stream, and pushes formatted messages to the browser.
 
 So: **the simulator drives everything; pub/sub is the backbone; the WebSocket is the only thing the dashboard needs.**
@@ -55,7 +55,7 @@ So: **the simulator drives everything; pub/sub is the backbone; the WebSocket is
 Each agent is a class with one async method, chained by the manager:
 - **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini LLM. Falls back to heuristic if neither available. The predictor maps live telemetry fields to model feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it falls back to the heuristic automatically.
 - **`planning.py`** — maps risk level + event type to an action (`MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`) and resource quantities.
-- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate the plan, then execute. Execution respects the `DRY_RUN` flag (logs instead of mutating state).
+- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate the plan, then execute. `ValidationAgent` returns `INVALID` (with reason) when a resource shortfall is detected; execution is skipped in that case. Execution respects the `DRY_RUN` flag (logs instead of mutating state).
 
 ### Graceful degradation (important)
 The system runs with **nothing external configured**:
@@ -70,7 +70,7 @@ When adding features, preserve this zero-external-deps property.
 Pydantic `Settings` singleton (`settings`). Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `GEMINI_API_KEY`/`GEMINI_MODEL`, `ML_MODEL_PATH`, `CORS_ORIGINS`. Env vars are case-sensitive.
 
 ### REST routers (`backend/app/routers/`, prefix `/api/v1`)
-- `events` — `GET /live` (SSE), `GET /history` (stub), **`POST /trigger`** (inject event + run pipeline)
+- `events` — `GET /history` (last 100 events from in-memory ring buffer, newest-first, `?limit=`), **`POST /trigger`** (inject event + run pipeline)
 - `vendors` — `GET /` returns in-memory vendor list
 - `zones` — `GET /` returns zone names
 - `websockets` — `/ws/dashboard` multiplex WS

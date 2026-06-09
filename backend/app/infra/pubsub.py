@@ -7,11 +7,15 @@ Provides named channels for agent pipeline stages and telemetry events.
 
 import asyncio
 import json
+from collections import deque
 from datetime import datetime, timezone
-from typing import Any, AsyncGenerator, Dict, Optional
+from typing import Any, Deque, Dict, List, Optional
 from loguru import logger
 
 from .mock_redis import mock_redis
+
+TELEMETRY_RAW_CHANNEL = "arena:telemetry:raw"
+_HISTORY_MAX = 100
 
 
 # ---------------------------------------------------------------------------
@@ -19,7 +23,6 @@ from .mock_redis import mock_redis
 # ---------------------------------------------------------------------------
 class Channels:
     """Well-known pub/sub channel names."""
-    TELEMETRY_EVENTS = "telemetry.events"
     AGENT_PERCEPTION = "agent.perception"
     AGENT_PLANNING = "agent.planning"
     AGENT_INVENTORY = "agent.inventory"
@@ -39,6 +42,7 @@ class PubSubService:
 
     def __init__(self):
         self._redis = mock_redis
+        self._telemetry_history: Deque[Dict] = deque(maxlen=_HISTORY_MAX)
 
     async def publish(self, channel: str, data: Dict[str, Any],
                       source: Optional[str] = None) -> int:
@@ -66,6 +70,10 @@ class PubSubService:
         }
         serialized = json.dumps(message, default=str)
 
+        # Keep a rolling history of raw telemetry events
+        if channel == TELEMETRY_RAW_CHANNEL:
+            self._telemetry_history.append(data)
+
         # Also log to the execution log list
         await self._redis.lpush(
             f"log:{channel}",
@@ -85,24 +93,12 @@ class PubSubService:
         """Unsubscribe from a channel."""
         return await self._redis.unsubscribe(channel, queue)
 
-    async def stream(self, channel: str) -> AsyncGenerator[str, None]:
-        """
-        Async generator that yields messages from a channel.
-        Useful for SSE or WebSocket endpoints.
-        """
-        q = await self.subscribe(channel)
-        try:
-            while True:
-                message = await q.get()
-                yield message
-        except asyncio.CancelledError:
-            await self.unsubscribe(channel, q)
+    def get_telemetry_history(self, limit: int = _HISTORY_MAX) -> List[Dict]:
+        """Return the most recent telemetry events (newest first)."""
+        events = list(self._telemetry_history)
+        events.reverse()
+        return events[:limit]
 
-    async def get_recent_logs(self, channel: str, count: int = 50) -> list:
-        """Get the most recent log entries for a channel."""
-        raw = await self._redis.lrange(f"log:{channel}", 0, count - 1)
-        return [json.loads(entry) if isinstance(entry, str) else entry
-                for entry in raw]
 
 
 # Singleton instance
