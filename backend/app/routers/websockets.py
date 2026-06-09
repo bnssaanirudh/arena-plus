@@ -38,7 +38,8 @@ async def websocket_dashboard(websocket: WebSocket):
         Channels.AGENT_PLANNING,
         Channels.AGENT_INVENTORY,
         Channels.AGENT_VALIDATION,
-        Channels.AGENT_EXECUTION
+        Channels.AGENT_EXECUTION,
+        Channels.AGENT_MARKETING,
     ]
     
     queues = []
@@ -98,9 +99,21 @@ async def websocket_dashboard(websocket: WebSocket):
                 elif channel == Channels.AGENT_EXECUTION:
                     execution = data.get("execution", {})
                     status = execution.get("status", "UNKNOWN")
-                    executed = execution.get("executed_allocations") or execution.get("planned_allocations", [])
-                    action_text = f"Execution: {status} ({len(executed)} allocation(s))"
-                    reasoning = ""
+                    if status == "PENDING_APPROVAL":
+                        action_text = f"⏸ Awaiting human approval: {execution.get('action', '')}"
+                        reasoning = "High-impact action held for operator sign-off"
+                    else:
+                        executed = execution.get("executed_allocations") or execution.get("planned_allocations", [])
+                        orders = execution.get("restock_orders", [])
+                        action_text = f"Execution: {status} ({len(executed)} allocation(s))"
+                        if orders:
+                            action_text += f", {len(orders)} restock order(s)"
+                        reasoning = ""
+
+                elif channel == Channels.AGENT_MARKETING:
+                    deal = data.get("deal", {})
+                    action_text = f"Flash deal: {deal.get('headline', '')}"
+                    reasoning = deal.get("message", "")
 
                 elif channel == Channels.AGENT_PIPELINE:
                     stage = data.get("stage", "")

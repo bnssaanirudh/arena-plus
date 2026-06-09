@@ -13,6 +13,7 @@ configured or a call fails), preserving the zero-external-deps property.
 from loguru import logger
 
 from ..llm import gemini
+from . import adk_agent
 
 
 # Action types the planning agent can recommend
@@ -62,11 +63,19 @@ class PlanningAgent:
     async def plan(self, event_data: dict, risk_assessment: dict) -> dict:
         logger.info("PlanningAgent formulating plan")
 
+        # 1. Preferred path: the ADK agent (Gemini 3 + Elastic vendor tool).
+        adk_plan = await adk_agent.plan_via_adk(event_data, risk_assessment)
+        if adk_plan is not None:
+            adk_plan["planner"] = "adk"
+            return adk_plan
+
+        # 2. Direct Gemini JSON (ADK disabled/unavailable but Gemini configured).
         llm_plan = await self._gemini_plan(event_data, risk_assessment)
         if llm_plan is not None:
             llm_plan["planner"] = "gemini"
             return llm_plan
 
+        # 3. Deterministic heuristic — always available.
         plan = self._heuristic_plan(event_data, risk_assessment)
         plan["planner"] = "heuristic"
         return plan

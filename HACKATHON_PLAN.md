@@ -68,19 +68,19 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] 1.2.4 Deterministic heuristic kept as fallback; `plan["planner"]` tags which path ran. New `llm/gemini.py` unified client. Perception migrated to it too.
 
 ### 1.3 Google Cloud Agent Builder (ADK)
-- [ ] 1.3.1 Add `google-adk` (Agent Development Kit) to backend deps
-- [ ] 1.3.2 Define the ArenaPulse agent in ADK: system instruction, Gemini 3 model, tool registry
-- [ ] 1.3.3 Wrap the pipeline stages as ADK tools / sub-agents (Perception, Planning, Inventory, Validation, Execution)
-- [ ] 1.3.4 Drive `agent_manager.process_event()` through the ADK runner instead of manual `await` chaining
-- [ ] 1.3.5 Verify the agent still streams intermediate state to pub/sub (dashboard must keep working)
+- [x] 1.3.1 Added `google-adk` (installed: 2.2.0)
+- [x] 1.3.2 Defined the ArenaPulse agent in ADK (`agents/adk_agent.py` — `LlmAgent` `arenapulse_coordinator`: instruction, Gemini 3 model, tool registry)
+- [x] 1.3.3 Registered the Elastic vendor-search as an ADK `FunctionTool` (`find_nearby_vendors`) the agent calls autonomously while planning
+- [~] 1.3.4 Planning brain runs through the ADK `Runner` (`plan_via_adk`); Inventory/Validation/Execution stay deterministic so the dashboard keeps structured stages — full multi-tool routing is a stretch
+- [x] 1.3.5 Intermediate state still streams to pub/sub; ADK is import-guarded and falls back to direct Gemini → heuristic. **Live verification pending M3/M7 creds.**
 
 ### 1.4 Partner MCP server integration (Elastic) ⭐🚪
-- [ ] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config
-- [ ] 1.4.2 Register the Elastic MCP server as a **tool** on the ADK agent (so Gemini calls it autonomously)
-- [ ] 1.4.3 Migrate vendor + inventory + zone data into Elastic indices (reuse `elastic/` ingestion already in repo)
-- [ ] 1.4.4 Re-implement the Inventory agent's "find nearest low-stock vendor" as an **Elastic MCP tool call** (geo_distance + inventory filter) — this is the headline "superpower" moment
-- [ ] 1.4.5 Keep the in-memory haversine path as fallback only (don't let it mask whether MCP actually ran — log which path served the request)
-- [ ] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation
+- [ ] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config — **blocked on M4/M5**
+- [~] 1.4.2 ADK agent already exposes the vendor geo-search as a tool (`find_nearby_vendors`) Gemini calls autonomously; swap its backing from the home-grown `MCPTools` to the official Elastic MCP server once M4/M5 land
+- [ ] 1.4.3 Migrate vendor + inventory + zone data into Elastic indices (reuse `elastic/` ingestion already in repo) — needs ES endpoint
+- [x] 1.4.4 "Find nearest vendor" is wired as the agent's headline tool call (`adk_agent.find_nearby_vendors` → `MCPTools.find_nearest_vendor`, geo_distance); upgrades to real Elastic MCP transparently
+- [x] 1.4.5 In-memory haversine is fallback-only and logs which path served the request (ES vs in-memory)
+- [ ] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — needs live creds
 
 ### 1.5 Hosted project URL
 - [ ] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render)
@@ -99,7 +99,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 
 ## 2. 🧩 Project-idea feature parity (complete the "multi-step mission")
 
-The project_idea.md workflow has 4 steps + 2 actions. We're missing Step 3 and Action A.
+The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remains; **Action A + Action B + human oversight are done**.
 
 ### 2.1 Step 3 — Corrective RAG verification ("is the supply chain viable?")
 - [ ] 2.1.1 Index supplier / supply-chain constraint docs in Elastic (lead times, depot capacity, road-closure notes)
@@ -108,18 +108,18 @@ The project_idea.md workflow has 4 steps + 2 actions. We're missing Step 3 and A
 - [ ] 2.1.4 Surface the verification + any self-correction in the dashboard agent panel
 
 ### 2.2 Action A — Auto-generate flash deals to fans (the retail/commerce half)
-- [ ] 2.2.1 New `MarketingAgent` (or execution sub-action): Gemini drafts a hyper-local flash-deal message for the surge zone
-- [ ] 2.2.2 Publish flash deals to a new pub/sub channel + dashboard panel ("Autonomous Campaigns")
-- [ ] 2.2.3 Tie deal content to actual surge data (zone, item in surplus/shortage, time window)
+- [x] 2.2.1 New `MarketingAgent` (`agents/marketing.py`): Gemini drafts a hyper-local flash-deal message for the surge zone (heuristic template fallback)
+- [x] 2.2.2 Publishes deals to a new `AGENT_MARKETING` pub/sub channel; WS multiplexer forwards them (frontend "Autonomous Campaigns" panel still TODO — see 4.2)
+- [x] 2.2.3 Deal content tied to live surge data (zone, item-by-event-type, nearest vendor, 30-min window)
 
 ### 2.3 Action B — B2B restocking orders (extend existing execution)
-- [ ] 2.3.1 Formalize execution output as a structured "restock order" (vendor, item, qty, supplier)
-- [ ] 2.3.2 Write the order back to Elastic and show it in the dashboard
+- [x] 2.3.1 Execution emits structured restock orders (`order_id`, vendor, item, qty, supplier, status) for every dispatched allocation
+- [~] 2.3.2 Orders recorded via MCP (`record_agent_action`) and surfaced on the WS (count shown); writing to a dedicated Elastic index + a dashboard panel pending ES creds / frontend work
 - [ ] 2.3.3 (Stretch) simulate a supplier-side acknowledgement to close the loop
 
 ### 2.4 Human-in-the-loop oversight (rules emphasize "under your oversight")
-- [ ] 2.4.1 Add an approval gate for high-impact actions (EVACUATE_ZONE, large dispatch) — agent proposes, human confirms in UI
-- [ ] 2.4.2 Make the gate toggleable (full-auto for demo flair, supervised for the "you stay in control" narrative)
+- [x] 2.4.1 Approval gate for high-impact actions (EVACUATE_ZONE, or water+food ≥ `APPROVAL_RESOURCE_THRESHOLD`): pipeline pauses at `PENDING_APPROVAL`; `approvals` router (`GET /`, `POST /{event_id}`) lets a human approve/reject (backend done; UI control pending)
+- [x] 2.4.2 Toggleable via `APPROVAL_REQUIRED` (default false = full-auto demo flair; true = supervised "you stay in control")
 
 ---
 

@@ -174,3 +174,87 @@ class TestAgentManagerPipeline:
         assert "plan" in result
         # High risk should proceed past MONITOR
         assert result["plan"]["action"] != "MONITOR"
+        # The commerce half always fires on intervention
+        assert "deal" in result and result["deal"]["headline"]
+
+
+class TestMarketingAgent:
+    """Action A — autonomous flash deals."""
+
+    @pytest.mark.asyncio
+    async def test_deal_is_zone_and_item_aware(self):
+        from app.agents.marketing import MarketingAgent
+
+        plan = {"action": "DISPATCH_RESOURCES", "resources_required": {"water": 100, "food": 0}}
+        alloc = {"allocations": [{"vendor_id": "V1", "vendor_name": "Cool Drinks",
+                                  "take_water": 100, "take_food": 0}]}
+        deal = await MarketingAgent().run(MOCK_EVENT_HIGH_RISK, plan, alloc)
+
+        assert deal["headline"] and deal["message"]
+        assert 5 <= deal["discount_pct"] <= 50
+        assert deal["zone"] == MOCK_EVENT_HIGH_RISK["location"]
+        # crowd_surge promotes water; vendor name threaded through
+        assert deal["item"] == "water"
+        assert deal["vendor_name"] == "Cool Drinks"
+
+
+class TestRestockOrders:
+    """Action B — structured B2B restock orders."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_emits_restock_orders(self):
+        from app.agents.execution import ExecutionAgent
+        from app.config import settings
+
+        settings.DRY_RUN = True
+        validation = {
+            "status": "VALID",
+            "approved_allocations": [
+                {"vendor_id": "V1", "vendor_name": "Cool Drinks", "take_water": 300, "take_food": 100},
+            ],
+        }
+        result = await ExecutionAgent().execute(validation)
+        orders = result["restock_orders"]
+        assert len(orders) == 2  # one per (vendor, item) with qty > 0
+        items = {o["item"] for o in orders}
+        assert items == {"water", "food"}
+        assert all(o["order_id"].startswith("PO-") and o["supplier"] for o in orders)
+
+
+class TestApprovalGate:
+    """Human-in-the-loop oversight for high-impact actions."""
+
+    @pytest.mark.asyncio
+    async def test_high_impact_holds_then_resumes(self):
+        from app.agents.manager import AgentManager
+        from app.config import settings
+
+        settings.APPROVAL_REQUIRED = True
+        settings.APPROVAL_RESOURCE_THRESHOLD = 1  # force every dispatch to gate
+        try:
+            manager = AgentManager()
+            result = await manager.process_event(MOCK_EVENT_HIGH_RISK)
+            assert result["execution"]["status"] == "PENDING_APPROVAL"
+            assert MOCK_EVENT_HIGH_RISK["event_id"] in manager.list_pending()
+
+            resumed = await manager.resolve_approval(MOCK_EVENT_HIGH_RISK["event_id"], True)
+            assert resumed is not None
+            assert MOCK_EVENT_HIGH_RISK["event_id"] not in manager.list_pending()
+        finally:
+            settings.APPROVAL_REQUIRED = False
+
+    @pytest.mark.asyncio
+    async def test_reject_cancels_and_unknown_returns_none(self):
+        from app.agents.manager import AgentManager
+        from app.config import settings
+
+        settings.APPROVAL_REQUIRED = True
+        settings.APPROVAL_RESOURCE_THRESHOLD = 1
+        try:
+            manager = AgentManager()
+            await manager.process_event(MOCK_EVENT_HIGH_RISK)
+            rejected = await manager.resolve_approval(MOCK_EVENT_HIGH_RISK["event_id"], False)
+            assert rejected["status"] == "REJECTED"
+            assert await manager.resolve_approval("does-not-exist", True) is None
+        finally:
+            settings.APPROVAL_REQUIRED = False

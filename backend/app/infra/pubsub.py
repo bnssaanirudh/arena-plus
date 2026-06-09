@@ -27,6 +27,7 @@ class Channels:
     AGENT_INVENTORY = "agent.inventory"
     AGENT_VALIDATION = "agent.validation"
     AGENT_EXECUTION = "agent.execution"
+    AGENT_MARKETING = "agent.marketing"  # autonomous flash-deal campaigns
     AGENT_PIPELINE = "agent.pipeline"  # aggregated pipeline status
 
 

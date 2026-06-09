@@ -26,7 +26,19 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_LOCATION: str = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
     # Set to the exact Gemini 3 model id available in your project (verify in Vertex AI / AI Studio).
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-pro-preview")
-    
+
+    # Google Cloud Agent Builder / ADK. When True (and google-adk is installed and
+    # Gemini is configured), the planning brain runs as an ADK LlmAgent that can
+    # autonomously call the Elastic vendor-search tool. Falls back to direct Gemini
+    # JSON, then the deterministic heuristic — preserving zero-external-deps boot.
+    USE_ADK: bool = os.getenv("USE_ADK", "true").lower() == "true"
+
+    # Human-in-the-loop oversight. When True, high-impact actions (EVACUATE_ZONE and
+    # large dispatches) are held as PENDING_APPROVAL instead of auto-executing.
+    APPROVAL_REQUIRED: bool = os.getenv("APPROVAL_REQUIRED", "false").lower() == "true"
+    # A dispatch is "high impact" once requested water+food exceeds this threshold.
+    APPROVAL_RESOURCE_THRESHOLD: int = int(os.getenv("APPROVAL_RESOURCE_THRESHOLD", "5000"))
+
     # ML Model
     ML_MODEL_PATH: str = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),

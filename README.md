@@ -24,8 +24,10 @@ The human stays in control: high-impact actions (evacuation, large dispatch) rou
 
 **Backend (`backend/`, FastAPI + Python)**
 - **Simulator** (`simulator/engine.py`) — emits a telemetry event every few seconds and runs it through the agent.
-- **Agent pipeline** (`agents/`) — Perception → Planning → Inventory → Validation → Execution, each stage published to a pub/sub channel.
-  - **Gemini 3** (`llm/gemini.py`) is the reasoning brain (planning decisions). A deterministic heuristic is the fallback.
+- **Agent pipeline** (`agents/`) — Perception → Planning → Inventory → Validation → [human approval gate] → Execution → Marketing, each stage published to a pub/sub channel.
+  - **Gemini 3** (`llm/gemini.py`) is the reasoning brain. The planning decision runs through a real **Google ADK** `LlmAgent` (`adk_agent.py`) that can autonomously call the **Elastic** vendor-search tool — falling back to direct Gemini, then a deterministic heuristic.
+  - **Execution** emits structured B2B restock orders; the **MarketingAgent** drafts autonomous hyper-local flash deals — the commerce half of the mission.
+  - **Human-in-the-loop**: high-impact actions pause for approval (`POST /api/v1/approvals/{event_id}`) when `APPROVAL_REQUIRED` is set.
   - **Elastic MCP** is the agent's data superpower (vendor/inventory/geo search + RAG).
 - **Pub/sub** (`infra/`) — in-memory async mock Redis; no real Redis needed.
 - **WebSocket** (`routers/websockets.py`) — `/api/v1/ws/dashboard` multiplexes telemetry + all agent stages to the browser.

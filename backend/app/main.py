@@ -5,7 +5,7 @@ from loguru import logger
 
 from .config import settings
 from .simulator.engine import simulator_engine
-from .routers import events, vendors, zones, websockets
+from .routers import events, vendors, zones, websockets, approvals
 from .mcp import router as mcp_router
 from .elastic.client import check_connection
 from .elastic.indexes import setup_indexes
@@ -49,6 +49,7 @@ app.add_middleware(
 app.include_router(events.router, prefix=f"{settings.API_V1_STR}/events", tags=["events"])
 app.include_router(vendors.router, prefix=f"{settings.API_V1_STR}/vendors", tags=["vendors"])
 app.include_router(zones.router, prefix=f"{settings.API_V1_STR}/zones", tags=["zones"])
+app.include_router(approvals.router, prefix=f"{settings.API_V1_STR}/approvals", tags=["approvals"])
 app.include_router(websockets.router, prefix=f"{settings.API_V1_STR}/ws", tags=["websockets"])
 app.include_router(mcp_router.router, prefix=f"{settings.API_V1_STR}/mcp", tags=["mcp"])
 
