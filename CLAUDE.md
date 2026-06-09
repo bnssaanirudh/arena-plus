@@ -60,7 +60,7 @@ The Google Cloud **Agent Builder** requirement, satisfied via the **ADK** (`goog
 ### Agents (`backend/app/agents/`)
 Each agent is a class with one async method, chained by the manager:
 - **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini qualitative note. The predictor maps live telemetry to the model's feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it auto-falls-back to the heuristic. (The trained model uses lagged time-series features, so live coverage is intentionally low — heuristic is the honest path today.)
-- **`planning.py`** — **Gemini 3 is the brain**: `_gemini_plan` sends the situation to Gemini with a structured JSON schema and gets back action + priority + resources + reasoning. Falls back to `_heuristic_plan` (risk/event lookup) when Gemini is unavailable. `plan["planner"]` records which path ran. Actions: `MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`.
+- **`planning.py`** — decision core. `plan()` tries **ADK first** (`adk_agent.plan_via_adk`), then direct Gemini JSON (`_gemini_plan` with structured schema), then deterministic heuristic. `plan["planner"]` tags which path ran (`adk`/`gemini`/`heuristic`). Actions: `MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`.
 - **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate, then execute. `ValidationAgent` returns `INVALID` (with reason) on resource shortfall; execution is skipped in that case. Execution respects the `DRY_RUN` flag (logs instead of mutating state). On dispatch, `execution.py` also emits structured **B2B restock orders** (`restock_orders`: per vendor+item, routed to a supplier — project_idea Action B) and records them via MCP.
 - **`marketing.py`** (`MarketingAgent`) — the commerce half (project_idea Action A). After any intervention, Gemini drafts a **hyper-local flash deal** tied to the surge zone + item + a nearby vendor; published to `AGENT_MARKETING`. Heuristic template fallback when Gemini is unavailable.
 
@@ -92,6 +92,12 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 - `pages/Dashboard.tsx` — live control room. Opens WebSocket with exponential-backoff reconnect (1s→30s); shows Live/Reconnecting/Offline badge. Feeds Zustand store.
 - Backend base URL read from `VITE_API_BASE` env var (default `http://localhost:8000`). Set in `frontend/.env`. WS URL derived by replacing `http` → `ws`.
 - **`DemoControls`** "Trigger Surge" button calls `POST /api/v1/events/trigger` to manually inject a `crowd_surge` event through the full pipeline.
+- **Pending frontend panels** (backend ships the data; UI not yet built): flash deals (`AGENT_MARKETING` stream), restock orders (in `execution` WS payload), approval queue (`GET /api/v1/approvals/` + confirm/reject buttons). These are tracked in HACKATHON_PLAN 4.2.
+
+## Known issues / tech debt
+- **`__pycache__` tracked in git** — `backend/app/*/__pycache__` dirs are committed. Add `**/__pycache__/` and `**/*.pyc` to `.gitignore` to clean up.
+- **Frontend panels pending** — flash deals, restock orders, and approvals UI not yet built (see HACKATHON_PLAN 4.2).
+- **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).
 
 ## Knowledge graph (code-review-graph MCP)
 
