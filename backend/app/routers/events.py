@@ -2,6 +2,7 @@ import asyncio
 from fastapi import APIRouter
 from pydantic import BaseModel
 from ..simulator.events import generate_random_event, EVENT_TYPES
+from ..simulator.demo import run_demo_scenario
 from ..infra.pubsub import pubsub
 from ..agents.manager import agent_manager
 from typing import List, Dict, Any, Optional
@@ -31,3 +32,15 @@ async def trigger_event(body: TriggerEventRequest = TriggerEventRequest()):
 @router.get("/history")
 async def event_history(limit: int = 50) -> List[Dict[str, Any]]:
     return pubsub.get_telemetry_history(limit=min(limit, 100))
+
+
+@router.post("/demo")
+async def run_demo():
+    """Trigger the scripted 5-event surge cascade for demo/recording purposes.
+    Fires as a background task — returns immediately, events stream over WebSocket."""
+    asyncio.create_task(run_demo_scenario())
+    return {
+        "status": "demo_started",
+        "steps": 5,
+        "message": "5-event surge cascade started — watch the dashboard",
+    }

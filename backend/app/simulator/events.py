@@ -12,6 +12,7 @@ EVENT_TYPES = [
     "normal_flow"
 ]
 
+# Zone names + SoFi Stadium approximate coordinates (lat, lon)
 ZONES = [
     "North Gate",
     "South Gate",
@@ -21,6 +22,16 @@ ZONES = [
     "Merchandise Zone",
     "Parking"
 ]
+
+_ZONE_COORDS: Dict[str, tuple] = {
+    "North Gate":       (33.9574, -118.3379),
+    "South Gate":       (33.9494, -118.3395),
+    "East Gate":        (33.9534, -118.3342),
+    "West Gate":        (33.9534, -118.3448),
+    "Food Court":       (33.9540, -118.3392),
+    "Merchandise Zone": (33.9552, -118.3375),
+    "Parking":          (33.9510, -118.3420),
+}
 
 def generate_random_event() -> Dict[str, Any]:
     event_type = random.choices(
@@ -41,11 +52,14 @@ def generate_random_event() -> Dict[str, Any]:
         density_score = round(random.uniform(1.0, 5.0), 1)
         predicted_people = random.randint(500, 3000)
         
+    lat, lon = _ZONE_COORDS.get(zone, (33.9534, -118.3392))
     return {
         "event_id": str(uuid.uuid4()),
         "event_type": event_type,
         "location": zone,
         "density_score": density_score,
         "predicted_people": predicted_people,
+        "latitude": lat,
+        "longitude": lon,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
