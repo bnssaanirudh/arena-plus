@@ -5,6 +5,9 @@ import { LiveFeed } from '../components/LiveFeed';
 import { AgentPanel } from '../components/AgentPanel';
 import { Analytics } from '../components/Analytics';
 import { DemoControls } from '../components/DemoControls';
+import { CampaignsPanel } from '../components/CampaignsPanel';
+import { RestockPanel } from '../components/RestockPanel';
+import { ApprovalQueue } from '../components/ApprovalQueue';
 import { useStore } from '../store/useStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
@@ -15,7 +18,7 @@ const RECONNECT_MAX_MS = 30000;
 type WsStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
 export default function Dashboard() {
-  const { addEvent, addAgentAction } = useStore();
+  const { addEvent, addAgentAction, addFlashDeal, addRestockBatch, addApproval, resolveApproval } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
@@ -41,10 +44,25 @@ export default function Dashboard() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload.type === 'telemetry') {
-            addEvent(payload.data);
-          } else if (payload.type === 'agent_action') {
-            addAgentAction(payload.data);
+          switch (payload.type) {
+            case 'telemetry':
+              addEvent(payload.data);
+              break;
+            case 'agent_action':
+              addAgentAction(payload.data);
+              break;
+            case 'flash_deal':
+              addFlashDeal(payload.data);
+              break;
+            case 'restock_orders':
+              addRestockBatch(payload.data);
+              break;
+            case 'approval_needed':
+              addApproval(payload.data);
+              break;
+            case 'approval_resolved':
+              resolveApproval(payload.data.event_id);
+              break;
           }
         } catch (e) {
           console.error('Failed to parse websocket message', e);
@@ -73,7 +91,7 @@ export default function Dashboard() {
       wsRef.current?.close();
       setWsStatus('offline');
     };
-  }, [addEvent, addAgentAction]);
+  }, [addEvent, addAgentAction, addFlashDeal, addRestockBatch, addApproval, resolveApproval]);
 
   const statusColor: Record<WsStatus, string> = {
     live: 'bg-green-500',
@@ -175,6 +193,40 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-orange-500 shrink-0">Active Agents</h3>
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
               <AgentPanel />
+            </div>
+          </div>
+        </div>
+
+        {/* Second row — Approval Queue + Campaigns + Restock */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
+          {/* Approval Queue — full width when items present, collapses otherwise */}
+          <div className="lg:col-span-4 bg-red-950/30 border border-red-800/40 p-6 flex flex-col min-h-[300px]">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-red-400 shrink-0 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+              Approval Queue
+            </h3>
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              <ApprovalQueue />
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 bg-[#0a1628] border border-blue-900/40 p-6 flex flex-col min-h-[300px]">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-blue-400 shrink-0 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              Autonomous Campaigns
+            </h3>
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              <CampaignsPanel />
+            </div>
+          </div>
+
+          <div className="lg:col-span-4 bg-[#0f1a0f] border border-green-900/40 p-6 flex flex-col min-h-[300px]">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-green-400 shrink-0 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              B2B Restock Orders
+            </h3>
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+              <RestockPanel />
             </div>
           </div>
         </div>
