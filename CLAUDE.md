@@ -45,7 +45,7 @@ Run from `backend/`. The trained model lands in the top-level `models/` dir (not
 
 ### Backend data flow (the core loop)
 1. **`simulator/engine.py`** (`SimulatorEngine`) — on startup (`SIMULATION_ACTIVE=True`), loops every `SIMULATION_INTERVAL_SECONDS` (default 5s). Each tick generates a random telemetry event, publishes it to the `arena:telemetry:raw` channel, and fires `agent_manager.process_event(event)` as a background task.
-2. **`agents/manager.py`** (`AgentManager`) — a state machine: **Perception → Planning → Inventory → Validation → [approval gate] → Execution → Marketing**. It publishes the intermediate result of each stage to a dedicated pub/sub channel. The pipeline short-circuits and returns early if Planning decides `MONITOR`. When `APPROVAL_REQUIRED` is set and the plan is high-impact (EVACUATE_ZONE, or water+food ≥ `APPROVAL_RESOURCE_THRESHOLD`), it pauses at `PENDING_APPROVAL` and waits for `resolve_approval()`; `_finalize()` (execution + marketing) is shared by the auto path and the post-approval resume.
+2. **`agents/manager.py`** (`AgentManager`) — state machine: **Perception → Planning → Inventory → Validation → Verification (RAG loop) → [approval gate] → Execution → Marketing**. Publishes each stage to its pub/sub channel. Short-circuits on `MONITOR`. The verification step can self-correct (re-run Planning+Inventory+Validation) up to `MAX_REPLANS=2` times when the plan is infeasible. When `APPROVAL_REQUIRED` and plan is high-impact, pauses at `PENDING_APPROVAL`; `_finalize()` is shared by auto and post-approval paths.
 3. **`infra/pubsub.py`** (`pubsub`) — thin JSON+timestamp layer over **`infra/mock_redis.py`** (an in-memory async fake Redis). Channel names live in the `Channels` class. Raw telemetry events are kept in a 100-event in-memory ring buffer (`_telemetry_history`) served by `GET /api/v1/events/history`.
 4. **`routers/websockets.py`** — `/api/v1/ws/dashboard` subscribes to the raw telemetry channel + all agent channels, multiplexes them into one stream, and pushes formatted messages to the browser.
 
@@ -61,8 +61,9 @@ The Google Cloud **Agent Builder** requirement, satisfied via the **ADK** (`goog
 Each agent is a class with one async method, chained by the manager:
 - **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini qualitative note. The predictor maps live telemetry to the model's feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it auto-falls-back to the heuristic. (The trained model uses lagged time-series features, so live coverage is intentionally low — heuristic is the honest path today.)
 - **`planning.py`** — decision core. `plan()` tries **ADK first** (`adk_agent.plan_via_adk`), then direct Gemini JSON (`_gemini_plan` with structured schema), then deterministic heuristic. `plan["planner"]` tags which path ran (`adk`/`gemini`/`heuristic`). Actions: `MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`.
-- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate, then execute. `ValidationAgent` returns `INVALID` (with reason) on resource shortfall; execution is skipped in that case. Execution respects the `DRY_RUN` flag (logs instead of mutating state). On dispatch, `execution.py` also emits structured **B2B restock orders** (`restock_orders`: per vendor+item, routed to a supplier — project_idea Action B) and records them via MCP.
-- **`marketing.py`** (`MarketingAgent`) — the commerce half (project_idea Action A). After any intervention, Gemini drafts a **hyper-local flash deal** tied to the surge zone + item + a nearby vendor; published to `AGENT_MARKETING`. Heuristic template fallback when Gemini is unavailable.
+- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate, then execute. `ValidationAgent` returns `INVALID` (with reason) on resource shortfall; execution is skipped. Execution respects `DRY_RUN`. On dispatch emits structured **B2B restock orders** (`restock_orders`: PO-xxxx, vendor, item, qty, supplier) recorded via MCP.
+- **`verification.py`** (`VerificationAgent`) — RAG feasibility check (project_idea Step 3). Retrieves supply-chain constraints from `_CONSTRAINTS` (8 entries: road closures, depot capacity, lead times) by zone+action keyword match. Gemini checks feasibility; heuristic flags HIGH-severity blockers. If infeasible, returns `correction` instruction for self-correction. **To upgrade to Elastic**: replace `_retrieve_constraints()` body with an ES BM25/kNN call — interface unchanged.
+- **`marketing.py`** (`MarketingAgent`) — commerce half (project_idea Action A). After any intervention, Gemini drafts a hyper-local flash deal (zone + item-by-event-type + nearest vendor + 30-min window); published to `AGENT_MARKETING`. Heuristic fallback.
 
 ### Graceful degradation (important)
 The system runs with **nothing external configured**:
@@ -77,11 +78,11 @@ When adding features, preserve this zero-external-deps property — credentials 
 Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`. Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (default `gemini-3-pro-preview`), `GEMINI_API_KEY`. Agent: `USE_ADK` (default true — route planning through the ADK agent when available), `APPROVAL_REQUIRED` (default false), `APPROVAL_RESOURCE_THRESHOLD` (default 5000). See `backend/.env.example`.
 
 ### REST routers (`backend/app/routers/`, prefix `/api/v1`)
-- `events` — `GET /history` (last 100 events from in-memory ring buffer, newest-first, `?limit=`), **`POST /trigger`** (inject event + run pipeline)
+- `events` — `GET /history` (last 100 events, newest-first, `?limit=`), **`POST /trigger`** (inject single event + run pipeline), **`POST /demo`** (fire scripted 5-event surge cascade — background task, streams over WS)
 - `vendors` — `GET /` returns in-memory vendor list
 - `zones` — `GET /` returns zone names
 - `approvals` — `GET /` lists pipelines held for human approval; **`POST /{event_id}`** `{approved: bool}` resumes (execute) or cancels (reject) a held pipeline
-- `websockets` — `/ws/dashboard` multiplex WS (subscribes to telemetry + all agent channels incl. `AGENT_MARKETING`)
+- `websockets` — `/ws/dashboard` multiplex WS. Emits `agent_action` for every stage (AgentPanel) **plus** rich typed messages: `flash_deal`, `restock_orders`, `approval_needed`, `approval_resolved`, `verification` — consumed by the three new frontend panels.
 - `mcp` — current home-grown tools (nearest vendor, overloaded zones, inventory) over ES with in-memory haversine fallback. **Being migrated to the official Elastic MCP server** as the agent's tool layer (HACKATHON_PLAN 1.4).
 
 ### Observability
@@ -91,13 +92,20 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 - React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`, no config file) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`). Charts via `recharts`, maps via `react-leaflet`, animation via `framer-motion`.
 - `pages/Dashboard.tsx` — live control room. Opens WebSocket with exponential-backoff reconnect (1s→30s); shows Live/Reconnecting/Offline badge. Feeds Zustand store.
 - Backend base URL read from `VITE_API_BASE` env var (default `http://localhost:8000`). Set in `frontend/.env`. WS URL derived by replacing `http` → `ws`.
-- **`DemoControls`** "Trigger Surge" button calls `POST /api/v1/events/trigger` to manually inject a `crowd_surge` event through the full pipeline.
-- **Pending frontend panels** (backend ships the data; UI not yet built): flash deals (`AGENT_MARKETING` stream), restock orders (in `execution` WS payload), approval queue (`GET /api/v1/approvals/` + confirm/reject buttons). These are tracked in HACKATHON_PLAN 4.2.
+- **`DemoControls`** — "Run Demo" fires `POST /api/v1/events/demo` (scripted 5-event cascade with live status label); "Trigger Surge" fires a single `crowd_surge`.
+- **`CampaignsPanel`** — streams flash deals from `flash_deal` WS messages (headline, discount%, zone, vendor, drafted_by).
+- **`RestockPanel`** — streams B2B restock order batches from `restock_orders` WS messages (PO-xxxx, item, qty, supplier).
+- **`ApprovalQueue`** — shows `PENDING_APPROVAL` actions with live Approve/Reject buttons wired to `POST /api/v1/approvals/{event_id}`; auto-clears on `approval_resolved`.
+- All three panels in a second row below the existing Analytics + AgentPanel grid on Dashboard.
+
+### Demo scenario (`backend/app/simulator/demo.py`)
+`run_demo_scenario()`: 5-event scripted cascade (~50s total): normal_flow → congestion → crowd_surge (South Gate — road closure triggers RAG self-correction) → security_alert → recovery. Each event has SoFi Stadium lat/lon. All random events from `simulator/events.py` also now include lat/lon so the ADK vendor-search tool always has coordinates.
 
 ## Known issues / tech debt
-- **`__pycache__` tracked in git** — `backend/app/*/__pycache__` dirs are committed. Add `**/__pycache__/` and `**/*.pyc` to `.gitignore` to clean up.
-- **Frontend panels pending** — flash deals, restock orders, and approvals UI not yet built (see HACKATHON_PLAN 4.2).
 - **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).
+- **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic call when ES creds land.
+- **ML model story** — `SurgePredictor` runs at <20% coverage so always falls back to heuristic. Needs reframe as "fast pre-filter" (HACKATHON_PLAN 4.1) or retraining.
+- **`tsc` build errors** — `StadiumMap.tsx`, `Landing.tsx`, `Operations.tsx`, `Analytics.tsx`, `LiveFeed.tsx` have pre-existing TS errors. Vite dev server works fine; `npm run build` fails on these. Fix before deploy.
 
 ## Knowledge graph (code-review-graph MCP)
 
