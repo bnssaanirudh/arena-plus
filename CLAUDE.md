@@ -59,7 +59,7 @@ The Google Cloud **Agent Builder** requirement, satisfied via the **ADK** (`goog
 
 ### Agents (`backend/app/agents/`)
 Each agent is a class with one async method, chained by the manager:
-- **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini qualitative note. The predictor maps live telemetry to the model's feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it auto-falls-back to the heuristic. (The trained model uses lagged time-series features, so live coverage is intentionally low — heuristic is the honest path today.)
+- **`perception.py`** — two-stage risk assessment: (1) **ML pre-filter** via `ml/predictor.py` `surge_predictor` produces a fast triage signal (always heuristic at runtime — trained model needs 53 archival features, live events only have 4), (2) **Gemini primary reasoning** — `generate_json(schema=_RISK_SCHEMA)` produces the authoritative `{risk_level, probability, reasoning}`. Gemini result is the final answer; ML/heuristic is fallback when Gemini not configured. Output includes `pre_filter` key for transparency.
 - **`planning.py`** — decision core. `plan()` tries **ADK first** (`adk_agent.plan_via_adk`), then direct Gemini JSON (`_gemini_plan` with structured schema), then deterministic heuristic. `plan["planner"]` tags which path ran (`adk`/`gemini`/`heuristic`). Actions: `MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`.
 - **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate, then execute. `ValidationAgent` returns `INVALID` (with reason) on resource shortfall; execution is skipped. Execution respects `DRY_RUN`. On dispatch emits structured **B2B restock orders** (`restock_orders`: PO-xxxx, vendor, item, qty, supplier) recorded via MCP.
 - **`verification.py`** (`VerificationAgent`) — RAG feasibility check (project_idea Step 3). Retrieves supply-chain constraints from `_CONSTRAINTS` (8 entries: road closures, depot capacity, lead times) by zone+action keyword match. Gemini checks feasibility; heuristic flags HIGH-severity blockers. If infeasible, returns `correction` instruction for self-correction. **To upgrade to Elastic**: replace `_retrieve_constraints()` body with an ES BM25/kNN call — interface unchanged.
@@ -68,7 +68,7 @@ Each agent is a class with one async method, chained by the manager:
 ### Graceful degradation (important)
 The system runs with **nothing external configured**:
 - **Elasticsearch** — `check_connection()` is best-effort; if ES is down, index setup/ingestion are skipped. MCP tools (`mcp/tools.py`) automatically fall back to the in-memory `VENDORS_DB` for vendor queries (haversine geo-filter) and in-memory cache for inventory updates. The full dispatch pipeline works without ES.
-- **Gemini** — if neither Vertex AI nor an AI Studio key is configured, `planning.py` uses its heuristic and `perception.py` skips the qualitative note.
+- **Gemini** — if neither Vertex AI nor an AI Studio key is configured, `planning.py` uses its heuristic and `perception.py` falls back to the ML/heuristic pre-filter result directly.
 - **ML model** — `SurgePredictor` falls back to heuristic if `models/surge_predictor.joblib` missing, or if live feature coverage < 20%.
 - **Redis** — no real Redis; `mock_redis.py` always used.
 
@@ -89,14 +89,14 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 `observability/tracer.py` `setup_phoenix()` wires Arize Phoenix + OpenTelemetry at startup.
 
 ### Frontend (`frontend/src/`)
-- React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`, no config file) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`). Charts via `recharts`, maps via `react-leaflet`, animation via `framer-motion`.
+- React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`, no config file) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`) — types: `TelemetryEvent`, `AgentAction`, `FlashDeal`, `RestockBatch`, `PendingApproval`; all `addX` actions deduplicate by key (`event_id` or `agent+timestamp+action`) as defense against double-delivery. Charts via `recharts`, maps via `react-leaflet`, animation via `framer-motion`.
 - `pages/Dashboard.tsx` — live control room. WebSocket opened once via `useEffect([], [])` — **critical**: WS message handler reads store via `useStore.getState()` (not closure capture) to avoid stale references and prevent React 19 Strict Mode from spawning duplicate connections. `destroyed` + `ws !== currentWs` guards prevent stale `onclose` from reconnecting after component remounts.
 - Backend base URL read from `VITE_API_BASE` env var (default `http://localhost:8000`). Set in `frontend/.env`. WS URL derived by replacing `http` → `ws`.
 - **`DemoControls`** — "Run Demo" fires `POST /api/v1/events/demo` (scripted 5-event cascade with live status label); "Trigger Surge" fires a single `crowd_surge`.
 - **`CampaignsPanel`** — streams flash deals from `flash_deal` WS messages (headline, discount%, zone, vendor, drafted_by).
 - **`RestockPanel`** — streams B2B restock order batches from `restock_orders` WS messages (PO-xxxx, item, qty, supplier).
 - **`ApprovalQueue`** — shows `PENDING_APPROVAL` actions with live Approve/Reject buttons wired to `POST /api/v1/approvals/{event_id}`; auto-clears on `approval_resolved`.
-- All three panels in a second row below the existing Analytics + AgentPanel grid on Dashboard.
+- All three panels in a second row below the existing Analytics + AgentPanel grid on Dashboard. All panel containers use explicit `h-[Xpx]` (not `min-h`) so they never grow unbounded on any viewport.
 
 ### Demo scenario (`backend/app/simulator/demo.py`)
 `run_demo_scenario()`: 5-event scripted cascade (~50s total): normal_flow → congestion → crowd_surge (South Gate — road closure triggers RAG self-correction) → security_alert → recovery. Each event has SoFi Stadium lat/lon. All random events from `simulator/events.py` also now include lat/lon so the ADK vendor-search tool always has coordinates.
@@ -104,8 +104,7 @@ Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key
 ## Known issues / tech debt
 - **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).
 - **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic call when ES creds land.
-- **`tsc` build errors** — `StadiumMap.tsx`, `Analytics.tsx` have pre-existing TS errors (7 total). Vite dev server works fine; `npm run build` fails on these files only. Fix before deploy.
-- **Zustand store dedup** — `addAgentAction`, `addEvent`, `addFlashDeal`, `addRestockBatch` all deduplicate by key (agent+timestamp, event_id) as defense against any future double-WS edge cases.
+- **`tsc` build errors** — `StadiumMap.tsx`, `Analytics.tsx` have 7 pre-existing TS errors (Leaflet type mismatches, unused var). Vite dev server works fine; `npm run build` fails on these files only. Fix before deploy.
 
 ## Knowledge graph (code-review-graph MCP)
 
