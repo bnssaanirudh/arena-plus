@@ -9,11 +9,18 @@ interface TelemetryEvent {
   timestamp: string;
 }
 
+interface AgentAction {
+  agent_name: string;
+  action: string;
+  reasoning: string;
+  timestamp: string;
+}
+
 interface AppState {
   liveEvents: TelemetryEvent[];
-  agentActions: any[];
+  agentActions: AgentAction[];
   addEvent: (event: TelemetryEvent) => void;
-  addAgentAction: (action: any) => void;
+  addAgentAction: (action: AgentAction) => void;
   isDemoMode: boolean;
   setDemoMode: (val: boolean) => void;
 }

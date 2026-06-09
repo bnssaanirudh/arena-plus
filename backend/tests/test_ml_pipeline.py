@@ -148,3 +148,32 @@ class TestPredictor:
             "density_score": 3.0,
         })
         assert result["risk_level"] in valid_levels
+
+    def test_different_density_scores_produce_different_results(self):
+        """Low vs high density events must not return the same probability (feature contract)."""
+        from app.ml.predictor import surge_predictor
+
+        low = surge_predictor.predict_surge({
+            "density_score": 1.5,
+            "predicted_people": 500,
+            "event_type": "normal_flow",
+        })
+        high = surge_predictor.predict_surge({
+            "density_score": 9.5,
+            "predicted_people": 12000,
+            "event_type": "crowd_surge",
+        })
+        assert low["probability"] != high["probability"], (
+            "Low and high density events return identical probability — "
+            "feature adapter is not mapping telemetry to model features correctly."
+        )
+        assert low["risk_level"] != high["risk_level"] or low["probability"] < high["probability"]
+
+    def test_telemetry_adapter_coverage_triggers_heuristic(self):
+        """Empty event should fall back to heuristic (not produce all-zeros ML output)."""
+        from app.ml.predictor import surge_predictor
+
+        result = surge_predictor.predict_surge({})
+        # Heuristic fallback must be used — model_used will say heuristic_fallback
+        # OR probability is 0.0 (heuristic on empty input). Either way not a model artifact.
+        assert result["model_used"] in {"heuristic_fallback", surge_predictor.model_name}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StadiumMap } from '../components/StadiumMap';
 import { LiveFeed } from '../components/LiveFeed';
@@ -7,30 +7,86 @@ import { Analytics } from '../components/Analytics';
 import { DemoControls } from '../components/DemoControls';
 import { useStore } from '../store/useStore';
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+const WS_URL = API_BASE.replace(/^http/, 'ws') + '/api/v1/ws/dashboard';
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+
+type WsStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
+
 export default function Dashboard() {
   const { addEvent, addAgentAction } = useStore();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
+  const wsRef = useRef<WebSocket | null>(null);
+  const retryDelayRef = useRef(RECONNECT_BASE_MS);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8000/api/v1/ws/dashboard');
-    
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.type === 'telemetry') {
-          addEvent(payload.data);
-        } else if (payload.type === 'agent_action') {
-          addAgentAction(payload.data);
+    unmountedRef.current = false;
+
+    function connect() {
+      if (unmountedRef.current) return;
+      setWsStatus('connecting');
+
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        retryDelayRef.current = RECONNECT_BASE_MS;
+        setWsStatus('live');
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'telemetry') {
+            addEvent(payload.data);
+          } else if (payload.type === 'agent_action') {
+            addAgentAction(payload.data);
+          }
+        } catch (e) {
+          console.error('Failed to parse websocket message', e);
         }
-      } catch (e) {
-        console.error("Failed to parse websocket message", e);
-      }
-    };
+      };
+
+      ws.onclose = () => {
+        if (unmountedRef.current) return;
+        setWsStatus('reconnecting');
+        retryTimerRef.current = setTimeout(() => {
+          retryDelayRef.current = Math.min(retryDelayRef.current * 2, RECONNECT_MAX_MS);
+          connect();
+        }, retryDelayRef.current);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    }
+
+    connect();
 
     return () => {
-      ws.close();
+      unmountedRef.current = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      wsRef.current?.close();
+      setWsStatus('offline');
     };
   }, [addEvent, addAgentAction]);
+
+  const statusColor: Record<WsStatus, string> = {
+    live: 'bg-green-500',
+    connecting: 'bg-yellow-500 animate-pulse',
+    reconnecting: 'bg-orange-500 animate-pulse',
+    offline: 'bg-red-500',
+  };
+  const statusLabel: Record<WsStatus, string> = {
+    live: 'Live',
+    connecting: 'Connecting…',
+    reconnecting: 'Reconnecting…',
+    offline: 'Offline',
+  };
 
   return (
     <div className="w-full min-h-screen flex flex-col relative bg-black text-white selection:bg-orange-500 selection:text-white pb-20">
@@ -51,6 +107,11 @@ export default function Dashboard() {
             </Link>
         </div>
         <div className="pointer-events-auto flex items-center gap-6">
+          {/* Connection status badge */}
+          <div className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+            <span className={`w-2 h-2 rounded-full ${statusColor[wsStatus]}`}></span>
+            <span className="text-white/70">{statusLabel[wsStatus]}</span>
+          </div>
           <DemoControls />
           <button 
             onClick={() => setMenuOpen(!menuOpen)}

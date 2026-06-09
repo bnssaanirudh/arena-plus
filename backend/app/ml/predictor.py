@@ -23,6 +23,33 @@ except ImportError:
 MODELS_DIR = Path(__file__).resolve().parents[3] / "models"
 DEFAULT_MODEL_PATH = MODELS_DIR / "surge_predictor.joblib"
 
+# ---------------------------------------------------------------------------
+# Telemetry → model feature adapter
+# ---------------------------------------------------------------------------
+# The trained model expects 53 archival/historical features. Live simulator
+# events only carry: event_type, location, density_score, predicted_people.
+# This map gives the best-effort approximation for each model feature.
+# Features not listed stay at 0 (their default).
+_TELEMETRY_FEATURE_MAP: Dict[str, Any] = {
+    # density_score (0-10) is the closest proxy for occupancy/pressure metrics
+    "max_occupancy_prob":  lambda e: e.get("density_score", 0) / 10.0,
+    "avg_occupancy_prob":  lambda e: e.get("density_score", 0) / 10.0,
+    "avg_pressure_mat":    lambda e: e.get("density_score", 0) / 10.0,
+    "avg_congestion":      lambda e: e.get("density_score", 0) / 10.0,
+    "max_congestion":      lambda e: e.get("density_score", 0) / 10.0,
+    # high_congestion_ratio: fraction of zone above threshold (approx)
+    "high_congestion_ratio": lambda e: max(0.0, (e.get("density_score", 0) - 5.0) / 5.0),
+    # crowd volume
+    "avg_people":      lambda e: float(e.get("predicted_people", 0)),
+    "max_people":      lambda e: float(e.get("predicted_people", 0)),
+    "Total_Attendance": lambda e: float(e.get("predicted_people", 0)),
+    "Zone_Attendance":  lambda e: float(e.get("predicted_people", 0)) * 0.15,
+}
+
+# If fewer than this fraction of FEATURE IMPORTANCE is covered by the adapter,
+# skip the model and use the heuristic (it's more accurate than all-zeros ML).
+_MIN_COVERAGE_THRESHOLD = 0.20
+
 
 class SurgePredictor:
     """
@@ -61,16 +88,32 @@ class SurgePredictor:
         except Exception as e:
             logger.error(f"Failed to load model: {e}. Using heuristic fallback.")
 
+    def _adapt_telemetry(self, event: Dict[str, Any]) -> tuple[Dict[str, Any], float]:
+        """
+        Map a live telemetry event to the model's feature space.
+        Returns (adapted_features, coverage_ratio) where coverage_ratio is
+        the fraction of total feature importance that got a real value.
+        """
+        adapted = dict(event)  # start with raw fields (passthrough for any matching keys)
+
+        for feat, fn in _TELEMETRY_FEATURE_MAP.items():
+            try:
+                adapted[feat] = fn(event)
+            except Exception:
+                pass  # leave at 0
+
+        # Estimate coverage: count model features that got a non-zero value
+        non_zero = sum(1 for f in self.feature_names if adapted.get(f, 0) != 0)
+        coverage = non_zero / len(self.feature_names) if self.feature_names else 0.0
+        return adapted, coverage
+
     def predict_surge(self, features: Dict[str, Any]) -> Dict[str, Any]:
         """
         Predict whether a crowd surge is likely to occur in the NEXT 20 MINUTES.
 
-        Parameters
-        ----------
-        features : dict
-            A flat dict of feature values. Keys should match the feature names
-            the model was trained on (including lagged and velocity features).
-            Missing keys default to 0.
+        Accepts the raw live telemetry event dict (density_score, predicted_people,
+        event_type, location). Internally adapts it to the model's feature space.
+        Falls back to heuristic when feature coverage is too low.
 
         Returns
         -------
@@ -82,10 +125,19 @@ class SurgePredictor:
         if not self._loaded or self.model is None:
             return self._heuristic_fallback(features)
 
+        adapted, coverage = self._adapt_telemetry(features)
+
+        if coverage < _MIN_COVERAGE_THRESHOLD:
+            logger.warning(
+                f"Feature coverage {coverage:.0%} below threshold "
+                f"({_MIN_COVERAGE_THRESHOLD:.0%}) — using heuristic fallback."
+            )
+            return self._heuristic_fallback(features)
+
         try:
-            # Build feature vector in the correct order
-            X = np.array([[features.get(f, 0) for f in self.feature_names]])
-            
+            # Build feature vector in the correct order using adapted fields
+            X = np.array([[adapted.get(f, 0) for f in self.feature_names]])
+
             # Get probability (class 1 = surge)
             if hasattr(self.model, "predict_proba"):
                 proba = self.model.predict_proba(X)[0]
@@ -95,7 +147,10 @@ class SurgePredictor:
                 surge_prob = float(pred)
 
             risk_level = self._prob_to_risk(surge_prob)
-
+            logger.debug(
+                f"ML prediction: {risk_level} ({surge_prob:.1%}) "
+                f"| feature coverage {coverage:.0%}"
+            )
             return {
                 "risk_level": risk_level,
                 "probability": round(surge_prob, 4),

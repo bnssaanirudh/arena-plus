@@ -19,8 +19,8 @@ export function StadiumMap() {
     const [vendors, setVendors] = useState<any[]>([]);
 
     useEffect(() => {
-        // Fetch vendors from backend
-        fetch('http://localhost:8000/api/v1/vendors/')
+        const apiBase = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+        fetch(`${apiBase}/api/v1/vendors/`)
             .then(res => res.json())
             .then(data => setVendors(data))
             .catch(err => console.error("Failed to fetch vendors", err));
@@ -67,13 +67,14 @@ export function StadiumMap() {
                 ))}
 
                 {/* Render Crowd Surges */}
-                {latestSurges.map((s, i) => {
-                    // Approximate lat/lon for zones to demo visuals
-                    const latOff = (Math.random() - 0.5) * 0.005;
-                    const lonOff = (Math.random() - 0.5) * 0.005;
+                {latestSurges.map((s) => {
+                    // Derive a stable offset from event_id so markers don't jump on re-render
+                    const hash = s.event_id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+                    const latOff = ((hash % 100) / 100 - 0.5) * 0.005;
+                    const lonOff = (((hash * 31) % 100) / 100 - 0.5) * 0.005;
                     return (
-                        <CircleMarker 
-                            key={`surge-${i}`}
+                        <CircleMarker
+                            key={`surge-${s.event_id}`}
                             center={[STADIUM_CENTER[0] + latOff, STADIUM_CENTER[1] + lonOff]}
                             radius={s.density_score * 3}
                             pathOptions={{ color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.5 }}

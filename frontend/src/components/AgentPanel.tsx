@@ -13,14 +13,18 @@ export function AgentPanel() {
                 {agentActions.length === 0 && (
                     <p className="text-slate-400 text-sm text-center py-4">No autonomous actions yet...</p>
                 )}
-                {agentActions.map((action, i) => (
-                    <div key={i} className="p-3 bg-slate-900 rounded-md border-l-4 border-purple-500 flex flex-col gap-1">
+                {agentActions.map((action) => (
+                    <div key={`${action.agent_name}-${action.timestamp}`} className="p-3 bg-slate-900 rounded-md border-l-4 border-purple-500 flex flex-col gap-1">
                         <div className="flex justify-between items-start">
                             <span className="font-semibold text-sm text-purple-300">{action.agent_name}</span>
-                            <span className="text-xs text-slate-500">{new Date().toLocaleTimeString()}</span>
+                            <span className="text-xs text-slate-500">
+                              {action.timestamp ? new Date(action.timestamp).toLocaleTimeString() : '—'}
+                            </span>
                         </div>
                         <p className="text-sm text-slate-300 mt-1">{action.action}</p>
-                        <p className="text-xs text-slate-500 italic mt-1">&quot;{action.reasoning}&quot;</p>
+                        {action.reasoning && (
+                          <p className="text-xs text-slate-500 italic mt-1">&quot;{action.reasoning}&quot;</p>
+                        )}
                     </div>
                 ))}
             </div>

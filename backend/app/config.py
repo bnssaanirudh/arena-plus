@@ -1,11 +1,19 @@
 import os
+from typing import List
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "ArenaPulse"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
-    
+
+    # CORS — wildcard + credentials is rejected by browsers; list explicit origins
+    CORS_ORIGINS: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://localhost:3000",
+    ]
+
     # Simulator Settings
     SIMULATION_INTERVAL_SECONDS: int = 5
     SIMULATION_ACTIVE: bool = True

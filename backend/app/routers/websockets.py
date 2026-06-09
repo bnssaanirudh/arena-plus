@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import asyncio
 import json
+from datetime import datetime, timezone
 from loguru import logger
 
 from ..infra.pubsub import pubsub, Channels
@@ -56,7 +57,8 @@ async def websocket_dashboard(websocket: WebSocket):
             channel = msg.get("channel", "")
             data = msg.get("data", {})
             source = msg.get("source", "system")
-            
+            timestamp = msg.get("timestamp", datetime.now(timezone.utc).isoformat())
+
             # Format message for frontend
             if channel == "arena:telemetry:raw":
                 payload = {
@@ -64,29 +66,54 @@ async def websocket_dashboard(websocket: WebSocket):
                     "data": data
                 }
             elif channel.startswith("agent."):
-                # We extract the relevant text/action for the AgentPanel
                 action_text = "Processing event..."
                 reasoning = ""
-                
+
                 if channel == Channels.AGENT_PERCEPTION:
                     assessment = data.get("risk_assessment", {})
-                    action_text = f"Assessed risk: {assessment.get('risk_level', 'UNKNOWN')}"
+                    risk = assessment.get("risk_level", "UNKNOWN")
+                    prob = assessment.get("probability", 0)
+                    action_text = f"Assessed risk: {risk} ({prob:.0%})"
                     reasoning = assessment.get("assessment", "")
+
                 elif channel == Channels.AGENT_PLANNING:
                     plan = data.get("plan", {})
-                    action_text = f"Formulated plan: {plan.get('action', 'UNKNOWN')}"
+                    action_text = f"Plan: {plan.get('action', 'UNKNOWN')} [{plan.get('priority', '')}]"
                     reasoning = plan.get("reasoning", "")
+
+                elif channel == Channels.AGENT_INVENTORY:
+                    alloc = data.get("allocation", {})
+                    count = len(alloc.get("allocations", []))
+                    shortfall = alloc.get("shortfall", {})
+                    action_text = f"Allocated {count} vendor(s)"
+                    if shortfall.get("water", 0) > 0 or shortfall.get("food", 0) > 0:
+                        action_text += f" (shortfall: water={shortfall.get('water',0)}, food={shortfall.get('food',0)})"
+                    reasoning = alloc.get("status", "")
+
+                elif channel == Channels.AGENT_VALIDATION:
+                    validation = data.get("validation", {})
+                    action_text = f"Validation: {validation.get('status', 'UNKNOWN')}"
+                    reasoning = validation.get("reason", "")
+
+                elif channel == Channels.AGENT_EXECUTION:
+                    execution = data.get("execution", {})
+                    status = execution.get("status", "UNKNOWN")
+                    executed = execution.get("executed_allocations") or execution.get("planned_allocations", [])
+                    action_text = f"Execution: {status} ({len(executed)} allocation(s))"
+                    reasoning = ""
+
                 elif channel == Channels.AGENT_PIPELINE:
                     stage = data.get("stage", "")
                     action_text = f"Pipeline {stage}"
                     reasoning = f"Event ID: {data.get('event_id', '')}"
-                
+
                 payload = {
                     "type": "agent_action",
                     "data": {
                         "agent_name": source,
                         "action": action_text,
-                        "reasoning": reasoning
+                        "reasoning": reasoning,
+                        "timestamp": timestamp,
                     }
                 }
             else:

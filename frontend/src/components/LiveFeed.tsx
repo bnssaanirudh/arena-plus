@@ -17,7 +17,7 @@ export function LiveFeed() {
                 {liveEvents.map(evt => (
                     <div key={evt.event_id} className="p-[0.75em] bg-slate-900 rounded-[0.4em] border-l-[0.25em] border-blue-500 flex flex-col gap-[0.25em]">
                         <div className="flex justify-between items-start">
-                            <span className="font-semibold text-slate-200 text-[1em]">{evt.event_type.replace('_', ' ').toUpperCase()}</span>
+                            <span className="font-semibold text-slate-200 text-[1em]">{evt.event_type.replaceAll('_', ' ').toUpperCase()}</span>
                             <span className="text-slate-500 text-[0.8em]">{new Date(evt.timestamp).toLocaleTimeString()}</span>
                         </div>
                         <div className="text-slate-300 text-[1em]">
