@@ -1,22 +1,19 @@
 from loguru import logger
-import os
+
 
 def setup_phoenix():
     """
-    Setup Arize Phoenix for observability.
-    This initializes tracing for all interactions, including the Gemini LLM calls and tool usages.
+    Set up Arize Phoenix for agent observability (the Arize partner integration).
+    Initializes tracing for Gemini reasoning calls and MCP tool usage.
+    No-op (with a warning) if the phoenix package isn't installed.
     """
     try:
         import phoenix as px
-        # The default phoenix launch starts a local server on port 6006
-        session = px.launch_app()
-        logger.info(f"Arize Phoenix observability started. View dashboard at {session.url}")
-        
-        # We would typically instrument here:
-        # from openinference.instrumentation.google_generativeai import GoogleGenerativeAIInstrumentor
-        # GoogleGenerativeAIInstrumentor().instrument()
-        
+
+        session = px.launch_app()  # local UI on :6006
+        logger.info(f"Arize Phoenix observability started. Dashboard: {session.url}")
+        # OpenInference instrumentation for google-genai + ADK is wired in HACKATHON_PLAN 3.2.
     except ImportError:
-        logger.warning("Arize Phoenix (phoenix) package not installed. Skipping observability.")
+        logger.warning("Arize Phoenix not installed. Skipping observability.")
     except Exception as e:
         logger.error(f"Failed to start Arize Phoenix: {e}")

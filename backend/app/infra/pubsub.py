@@ -10,7 +10,6 @@ import json
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any, Deque, Dict, List, Optional
-from loguru import logger
 
 from .mock_redis import mock_redis
 

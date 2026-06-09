@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**ArenaPulse** is an autonomous multi-agent logistics intelligence platform for large-scale events (e.g. FIFA World Cup 2026). A simulator generates crowd telemetry, a multi-agent pipeline assesses surge risk and decides interventions, and a live dashboard streams the whole pipeline over WebSocket. It is a monorepo: `frontend/` (React + Vite) and `backend/` (FastAPI + Python agents).
+**ArenaPulse** is an autonomous multi-agent logistics platform for large-scale events (e.g. FIFA World Cup 2026). A simulator generates crowd telemetry, a multi-agent pipeline assesses surge risk and decides interventions, and a live dashboard streams the whole pipeline over WebSocket. It is a monorepo: `frontend/` (React + Vite) and `backend/` (FastAPI + Python agents).
 
-> README and `context.md` are up to date as of 2026-06-09. See [`AUDIT.md`](AUDIT.md) for the bug inventory and [`TASKS.md`](TASKS.md) for the live work list.
+> **This project targets the Google Cloud "Building Agents" hackathon (Elastic partner track).** Brain = **Gemini 3** (`google-genai`); orchestration = **Google Cloud Agent Builder / ADK**; superpower = **Elastic MCP server**; observability = **Arize**. The live build plan, phases, and **manual setup tasks** are in [`HACKATHON_PLAN.md`](HACKATHON_PLAN.md). Product vision in [`project_idea.md`](project_idea.md).
 
 ## Commands
 
@@ -51,30 +51,33 @@ Run from `backend/`. The trained model lands in the top-level `models/` dir (not
 
 So: **the simulator drives everything; pub/sub is the backbone; the WebSocket is the only thing the dashboard needs.**
 
+### The Gemini brain (`backend/app/llm/gemini.py`)
+Unified async client over the **`google-genai`** SDK. Supports two auth modes via config: **Vertex AI** (`GOOGLE_GENAI_USE_VERTEXAI=true` + project/location — the hackathon path) and **AI Studio** (`GEMINI_API_KEY`). `is_available()` gates every call; `generate_text()` / `generate_json(schema=…)` return `None` on any failure so callers fall back. (Legacy `google-generativeai` SDK has been removed.)
+
 ### Agents (`backend/app/agents/`)
 Each agent is a class with one async method, chained by the manager:
-- **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini LLM. Falls back to heuristic if neither available. The predictor maps live telemetry fields to model feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it falls back to the heuristic automatically.
-- **`planning.py`** — maps risk level + event type to an action (`MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`) and resource quantities.
-- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate the plan, then execute. `ValidationAgent` returns `INVALID` (with reason) when a resource shortfall is detected; execution is skipped in that case. Execution respects the `DRY_RUN` flag (logs instead of mutating state).
+- **`perception.py`** — two-stage risk assessment: (1) ML via `ml/predictor.py` `surge_predictor`, (2) optional Gemini qualitative note. The predictor maps live telemetry to the model's feature space via `_TELEMETRY_FEATURE_MAP`; if coverage < 20% it auto-falls-back to the heuristic. (The trained model uses lagged time-series features, so live coverage is intentionally low — heuristic is the honest path today.)
+- **`planning.py`** — **Gemini 3 is the brain**: `_gemini_plan` sends the situation to Gemini with a structured JSON schema and gets back action + priority + resources + reasoning. Falls back to `_heuristic_plan` (risk/event lookup) when Gemini is unavailable. `plan["planner"]` records which path ran. Actions: `MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`.
+- **`inventory.py`**, **`validation.py`**, **`execution.py`** — allocate resources, validate, then execute. `ValidationAgent` returns `INVALID` (with reason) on resource shortfall; execution is skipped in that case. Execution respects the `DRY_RUN` flag (logs instead of mutating state).
 
 ### Graceful degradation (important)
 The system runs with **nothing external configured**:
 - **Elasticsearch** — `check_connection()` is best-effort; if ES is down, index setup/ingestion are skipped. MCP tools (`mcp/tools.py`) automatically fall back to the in-memory `VENDORS_DB` for vendor queries (haversine geo-filter) and in-memory cache for inventory updates. The full dispatch pipeline works without ES.
-- **Gemini** (`GEMINI_API_KEY` env var) — perception falls back to ML model / heuristic if unset.
-- **ML model** — `SurgePredictor` falls back to heuristic if `models/surge_predictor.joblib` missing. Even when loaded, uses heuristic if live feature coverage < 20%.
+- **Gemini** — if neither Vertex AI nor an AI Studio key is configured, `planning.py` uses its heuristic and `perception.py` skips the qualitative note.
+- **ML model** — `SurgePredictor` falls back to heuristic if `models/surge_predictor.joblib` missing, or if live feature coverage < 20%.
 - **Redis** — no real Redis; `mock_redis.py` always used.
 
-When adding features, preserve this zero-external-deps property.
+When adding features, preserve this zero-external-deps property — credentials should *upgrade* behavior, never be *required* to boot.
 
 ### Config (`backend/app/config.py`)
-Pydantic `Settings` singleton (`settings`). Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `GEMINI_API_KEY`/`GEMINI_MODEL`, `ML_MODEL_PATH`, `CORS_ORIGINS`. Env vars are case-sensitive.
+Pydantic `Settings` singleton (`settings`), env-var driven (case-sensitive). Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`. Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (default `gemini-3-pro-preview`), `GEMINI_API_KEY`. See `backend/.env.example`.
 
 ### REST routers (`backend/app/routers/`, prefix `/api/v1`)
 - `events` — `GET /history` (last 100 events from in-memory ring buffer, newest-first, `?limit=`), **`POST /trigger`** (inject event + run pipeline)
 - `vendors` — `GET /` returns in-memory vendor list
 - `zones` — `GET /` returns zone names
 - `websockets` — `/ws/dashboard` multiplex WS
-- `mcp` — ES-backed tools (nearest vendor, overloaded zones, inventory) with in-memory fallback
+- `mcp` — current home-grown tools (nearest vendor, overloaded zones, inventory) over ES with in-memory haversine fallback. **Being migrated to the official Elastic MCP server** as the agent's tool layer (HACKATHON_PLAN 1.4).
 
 ### Observability
 `observability/tracer.py` `setup_phoenix()` wires Arize Phoenix + OpenTelemetry at startup.

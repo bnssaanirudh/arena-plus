@@ -7,7 +7,7 @@ Used for local development; will be swapped for real Redis when deploying.
 
 import asyncio
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from loguru import logger
 
 

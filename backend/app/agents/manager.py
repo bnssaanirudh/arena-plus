@@ -8,7 +8,6 @@ Publishes intermediate state to pub/sub channels at each stage so the
 frontend dashboard can display real-time agent activity.
 """
 
-import asyncio
 from loguru import logger
 
 from .perception import PerceptionAgent

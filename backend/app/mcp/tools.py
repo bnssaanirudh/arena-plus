@@ -1,7 +1,6 @@
 import math
 from typing import List, Dict, Any
 from ..elastic.client import es_client
-from ..elastic.client import check_connection
 from ..simulator.vendors import get_all_vendors
 from loguru import logger
 import uuid
@@ -113,7 +112,7 @@ class MCPTools:
         try:
             res = await es_client.search(index="crowd_events", body=query)
             return [hit["_source"] for hit in res["hits"]["hits"]]
-        except Exception as e:
+        except Exception:
             return []
 
     @staticmethod
@@ -134,7 +133,7 @@ class MCPTools:
         try:
             res = await es_client.search(index="crowd_events", body=query)
             return [hit["_source"] for hit in res["hits"]["hits"]]
-        except Exception as e:
+        except Exception:
             return []
 
     @staticmethod

@@ -27,6 +27,33 @@ Legend: 🚪 qualification gate (no submission without it) · ⭐ judging maximi
 
 ---
 
+## 👤 Manual tasks (YOU, not the agent) — grouped by when they're needed
+
+These need a human (accounts, billing, recording, form-filling). Claude builds everything around them.
+
+**Before/during Phase 1–2 build (provision now, in parallel):**
+- [ ] M1. Create **Google Cloud account + project**, enable billing ($300 free trial) → share **project ID**
+- [ ] M2. Enable **Vertex AI API**, **Cloud Run**, **Agent Builder** in that project
+- [ ] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`)
+- [ ] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
+- [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
+- [ ] M6. (Secondary) Create a free **Arize AX** account → share **Space ID** + **API key**
+
+**After Phase 1–4 build (once agent + MCP + actions work locally):**
+- [ ] M7. Authenticate `gcloud` locally (`gcloud auth application-default login`) so Vertex calls work
+- [ ] M8. Smoke-test full pipeline locally with real Gemini + Elastic creds in `.env`
+
+**Phase 5 (deploy):**
+- [ ] M9. Approve/Cloud-Run deploy of backend (provide billing confirmation if prompted)
+- [ ] M10. Connect a Vercel/Firebase account for the frontend deploy
+
+**Phase 6 (submit) — all human:**
+- [ ] M11. Make the GitHub repo **public**
+- [ ] M12. Record the **~3-minute demo video**
+- [ ] M13. Fill out the **Devpost submission form** (title, tagline, screenshots, track = Elastic)
+
+---
+
 ## 1. 🚪 Qualification gates (MUST-HAVE to be eligible)
 
 ### 1.1 Open-source license
@@ -110,7 +137,7 @@ The project_idea.md workflow has 4 steps + 2 actions. We're missing Step 3 and A
 - [ ] 4.2 Dashboard: add an "Agent Reasoning Timeline" that shows the full multi-step mission per event (Perception→…→Actions) — makes the "beyond chatbot" story obvious on screen
 - [ ] 4.3 Seed a compelling demo scenario (a scripted surge cascade) wired to the dead `isDemoMode` toggle so the video has a reliable narrative
 - [ ] 4.4 README: lead with the agent architecture diagram + partner-MCP callout (judges skim READMEs)
-- [ ] 4.5 Update `context.md` / `CLAUDE.md` to reflect the ADK + Elastic-MCP + Gemini-3 architecture
+- [x] 4.5 `README.md` + `CLAUDE.md` updated to the Gemini-3 / ADK / Elastic-MCP architecture; stale docs (AUDIT/TASKS/context/leakage) removed
 
 ---
 

@@ -1,8 +1,7 @@
-import json
 import random
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 EVENT_TYPES = [
     "crowd_surge",

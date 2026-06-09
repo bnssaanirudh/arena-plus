@@ -1,69 +1,63 @@
-# ArenaPulse ✦ Autonomous Logistics Intelligence
+# ArenaPulse ✦ Autonomous World Cup Crowd & Commerce Coordinator
 
-ArenaPulse is an autonomous multi-agent logistics intelligence platform for large-scale events (e.g. FIFA World Cup 2026). A simulator generates crowd telemetry, a multi-agent pipeline assesses surge risk and decides interventions, and a live dashboard streams the whole pipeline over WebSocket.
+ArenaPulse is an **autonomous multi-agent system** for large-scale events (FIFA World Cup 2026). It doesn't answer questions — it **takes action**: a live stream of crowd telemetry triggers an agent that reasons about surge risk, checks vendor supply, verifies feasibility, and autonomously dispatches resources and hyper-local flash deals — all streamed to a live dashboard.
 
-> **Status note (2026-06):** This README previously described the project as "Phase 1 & 2 — frontend + mock simulator only." That was stale. The backend ML pipeline, the 5-stage agent state machine, the MCP tools, and the Elasticsearch ingestion are **all implemented**. See [`AUDIT.md`](AUDIT.md) for known bugs and [`TASKS.md`](TASKS.md) for the live work list.
+> Built for the **Google Cloud "Building Agents for Real-World Challenges"** hackathon — Gemini 3 brain · Google Cloud Agent Builder (ADK) · **Elastic** partner MCP track · Arize observability.
+>
+> 📋 Build status, phases, and the manual setup steps live in **[`HACKATHON_PLAN.md`](HACKATHON_PLAN.md)**. The product vision is in **[`project_idea.md`](project_idea.md)**.
 
-## What's implemented
+## The agent mission (multi-step, non-linear)
 
-**Backend (`backend/`, FastAPI)**
-- **Simulator** (`simulator/engine.py`) — every `SIMULATION_INTERVAL_SECONDS` (default 5s) generates a random telemetry event, publishes it to pub/sub, and runs it through the agent pipeline.
-- **Agent pipeline** (`agents/manager.py`) — a state machine: **Perception → Planning → Inventory → Validation → Execution**, publishing each stage to its own channel.
-  - Perception: ML prediction (`ml/predictor.py`) + optional Gemini LLM, with a heuristic fallback.
-  - Planning: maps risk → action (`MONITOR`, `DISPATCH_RESOURCES`, `REROUTE_CROWD`, `ALERT_SECURITY`, `EVACUATE_ZONE`).
-  - Inventory / Validation / Execution: allocate vendor resources, validate, then execute (respects `DRY_RUN`).
-- **Pub/sub** (`infra/pubsub.py` over `infra/mock_redis.py`) — in-memory async fake Redis; no real Redis required.
-- **WebSocket** (`routers/websockets.py`) — `/api/v1/ws/dashboard` multiplexes raw telemetry + all agent channels to the browser.
-- **ML** (`ml/`) — synthetic data generation + XGBoost/RandomForest training; trained model in top-level `models/`.
-- **Elasticsearch** (`elastic/`) — index setup + ingestion, **best-effort** (app runs fine with ES down).
-- **MCP tools** (`mcp/`) — ES-backed helpers (nearest vendor, overloaded zones, inventory) exposed over REST.
-- **Observability** (`observability/tracer.py`) — Arize Phoenix + OpenTelemetry.
-
-**Frontend (`frontend/`, React 19 + Vite 8 + Tailwind v4 + TypeScript)**
-- Marketing pages (Landing/Capabilities/Operations/Contact) + a live **Dashboard** control room (Leaflet map, live feed, recharts analytics, agent activity panel) wired to the WebSocket via a Zustand store.
-
-### Graceful degradation
-The system is designed to run with **nothing external configured** — no Redis (mock is always used), no Elasticsearch, no Gemini key, and even no trained model (heuristic fallback). Preserve this property when adding features.
-
-> ⚠️ **Known issues** (see `AUDIT.md`): the trained model currently predicts on an all-zero feature vector because live event keys don't match the model's training features (C1), and the resource-dispatch path is dead when ES is down because vendors live in-memory but are looked up in ES (C2). Fixes are tracked in `TASKS.md`.
-
-## 🛠️ Run locally
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev      # Vite dev server
+```
+[Crowd surge detected]
+   → Perceive    risk (ML pre-filter + Gemini 3 reasoning)
+   → Plan        the intervention (Gemini decides action + resources)
+   → Source      nearest low-stock vendors (Elastic MCP)
+   → Verify      supply-chain feasibility (RAG); self-correct if not viable
+   → Execute     ┌─ dispatch B2B restock orders
+                 └─ generate & push hyper-local flash deals to fans
 ```
 
-### Backend
+The human stays in control: high-impact actions (evacuation, large dispatch) route through an approval gate.
+
+## Architecture
+
+**Backend (`backend/`, FastAPI + Python)**
+- **Simulator** (`simulator/engine.py`) — emits a telemetry event every few seconds and runs it through the agent.
+- **Agent pipeline** (`agents/`) — Perception → Planning → Inventory → Validation → Execution, each stage published to a pub/sub channel.
+  - **Gemini 3** (`llm/gemini.py`) is the reasoning brain (planning decisions). A deterministic heuristic is the fallback.
+  - **Elastic MCP** is the agent's data superpower (vendor/inventory/geo search + RAG).
+- **Pub/sub** (`infra/`) — in-memory async mock Redis; no real Redis needed.
+- **WebSocket** (`routers/websockets.py`) — `/api/v1/ws/dashboard` multiplexes telemetry + all agent stages to the browser.
+- **Observability** (`observability/tracer.py`) — Arize Phoenix + OpenTelemetry traces of the agent's reasoning.
+
+**Frontend (`frontend/`, React 19 + Vite + Tailwind v4 + TypeScript)**
+- Live **Dashboard**: Leaflet stadium map, telemetry feed, analytics, and an agent-activity panel — wired to the WebSocket via Zustand.
+
+### Graceful degradation (design principle — preserve it)
+Runs with **nothing external configured**: mock Redis always; Elastic, Gemini, and the trained ML model are all optional with built-in fallbacks. Credentials simply upgrade the system from "fallback" to "full".
+
+## Run locally
+
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+# Frontend
+cd frontend && npm install && npm run dev      # http://localhost:5173
+
+# Backend
+cd backend && python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload     # http://localhost:8000
-```
+cp .env.example .env                           # optional: add Gemini / Elastic creds
+uvicorn app.main:app --reload                  # http://localhost:8000
 
-### Tests
-```bash
-cd backend
-pytest                                   # all
-pytest tests/test_agents.py::TestPlanningAgent::test_reroute_for_congestion   # one test
-```
-
-### ML model (optional — heuristic fallback works without it)
-```bash
-cd backend
-python -m app.ml.generate_synthetic_data   # -> data/synthetic/training_features.csv
-python -m app.ml.train_model               # -> models/surge_predictor.joblib (+ reports)
+# Tests
+cd backend && pytest
 ```
 
 ## Layout
 ```
-backend/app/    simulator, agents, infra (pubsub/mock_redis), ml, elastic, mcp, routers, observability
+backend/app/    simulator, agents, llm (gemini), infra (pubsub/mock_redis), ml, elastic, mcp, routers, observability
 frontend/src/   pages/, components/, store/
-models/         trained surge_predictor.joblib + reports
-data/           synthetic training data
+models/         trained surge_predictor.joblib
 ```
-See [`CLAUDE.md`](CLAUDE.md) for architecture details and the code-review-graph workflow.
+
+See [`CLAUDE.md`](CLAUDE.md) for architecture details. Licensed under [MIT](LICENSE).
