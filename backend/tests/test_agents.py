@@ -258,3 +258,58 @@ class TestApprovalGate:
             assert await manager.resolve_approval("does-not-exist", True) is None
         finally:
             settings.APPROVAL_REQUIRED = False
+
+
+class TestVerificationAgent:
+    """2.1 — RAG feasibility check + self-correction."""
+
+    @pytest.mark.asyncio
+    async def test_verify_returns_required_fields(self):
+        from app.agents.verification import VerificationAgent
+
+        plan = {"action": "DISPATCH_RESOURCES", "priority": "P1",
+                "resources_required": {"water": 200, "food": 50}, "reasoning": "high risk"}
+        alloc = {"allocations": [{"vendor_name": "Cool Drinks", "take_water": 200, "take_food": 50}]}
+        result = await VerificationAgent().verify(MOCK_EVENT_HIGH_RISK, plan, alloc)
+
+        assert "feasible" in result and isinstance(result["feasible"], bool)
+        assert result["confidence"] in ("HIGH", "MEDIUM", "LOW")
+        assert isinstance(result["blocking"], list)
+        assert "correction" in result
+        assert "constraints" in result
+        assert result["verified_by"] in ("gemini", "heuristic")
+
+    @pytest.mark.asyncio
+    async def test_constraint_retrieval_matches_zone(self):
+        from app.agents.verification import _retrieve_constraints
+
+        # South Gate has a road_closure HIGH constraint — should be retrieved
+        hits = _retrieve_constraints("South Gate", "DISPATCH_RESOURCES")
+        ids = [c["id"] for c in hits]
+        assert "C001" in ids  # road_closure for South Gate
+
+    @pytest.mark.asyncio
+    async def test_heuristic_flags_high_severity_blocking(self):
+        from app.agents.verification import VerificationAgent
+
+        # South Gate road_closure is HIGH severity → heuristic should flag infeasible
+        event = dict(MOCK_EVENT_HIGH_RISK, location="South Gate")
+        plan = {"action": "DISPATCH_RESOURCES", "priority": "P1",
+                "resources_required": {"water": 500, "food": 100}, "reasoning": "surge"}
+        alloc = {"allocations": []}
+        result = await VerificationAgent().verify(event, plan, alloc)
+        # heuristic path (no Gemini creds in test env)
+        assert result["verified_by"] == "heuristic"
+        assert result["feasible"] is False
+        assert len(result["blocking"]) > 0
+
+    @pytest.mark.asyncio
+    async def test_full_pipeline_includes_verification(self):
+        from app.agents.manager import AgentManager
+
+        manager = AgentManager()
+        result = await manager.process_event(MOCK_EVENT_HIGH_RISK)
+        # verification should be present for any non-MONITOR outcome
+        if result["plan"]["action"] != "MONITOR":
+            assert "verification" in result
+            assert "feasible" in result["verification"]

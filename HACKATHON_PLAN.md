@@ -102,10 +102,10 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remains; **Action A + Action B + human oversight are done**.
 
 ### 2.1 Step 3 — Corrective RAG verification ("is the supply chain viable?")
-- [ ] 2.1.1 Index supplier / supply-chain constraint docs in Elastic (lead times, depot capacity, road-closure notes)
-- [ ] 2.1.2 Add a RAG retrieval tool (Elastic vector/text search) the agent calls before committing actions
-- [ ] 2.1.3 Have Gemini re-evaluate the plan against retrieved constraints; if infeasible, the agent **self-corrects** (re-plan) — this is the "non-linear reasoning" judges reward
-- [ ] 2.1.4 Surface the verification + any self-correction in the dashboard agent panel
+- [x] 2.1.1 In-memory supply-chain constraint corpus (8 constraints: road closures, depot capacity, lead times across zones) — `agents/verification.py` `_CONSTRAINTS`. Upgrades to Elastic BM25/kNN by replacing `_retrieve_constraints()` body; interface unchanged.
+- [x] 2.1.2 `VerificationAgent.verify()` retrieves relevant constraints (keyword match on zone + action) and checks feasibility — Gemini primary, heuristic fallback
+- [x] 2.1.3 Self-correction loop in `manager._verify_with_correction()`: if infeasible, re-runs Planning with constraint context injected → re-runs Inventory+Validation. Up to `MAX_REPLANS=2` attempts. `plan["replan_count"]` tags corrected plans.
+- [x] 2.1.4 Publishes to `AGENT_VERIFICATION` channel; WS formats "✅ feasible" or "⚠️ self-correcting (attempt N)"; re-plan shows "↻ Re-plan:" prefix in agent panel
 
 ### 2.2 Action A — Auto-generate flash deals to fans (the retail/commerce half)
 - [x] 2.2.1 New `MarketingAgent` (`agents/marketing.py`): Gemini drafts a hyper-local flash-deal message for the surge zone (heuristic template fallback)

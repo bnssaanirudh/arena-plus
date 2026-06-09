@@ -38,6 +38,7 @@ async def websocket_dashboard(websocket: WebSocket):
         Channels.AGENT_PLANNING,
         Channels.AGENT_INVENTORY,
         Channels.AGENT_VALIDATION,
+        Channels.AGENT_VERIFICATION,
         Channels.AGENT_EXECUTION,
         Channels.AGENT_MARKETING,
     ]
@@ -79,8 +80,11 @@ async def websocket_dashboard(websocket: WebSocket):
 
                 elif channel == Channels.AGENT_PLANNING:
                     plan = data.get("plan", {})
-                    action_text = f"Plan: {plan.get('action', 'UNKNOWN')} [{plan.get('priority', '')}]"
+                    prefix = "↻ Re-plan: " if data.get("self_correction") else "Plan: "
+                    action_text = f"{prefix}{plan.get('action', 'UNKNOWN')} [{plan.get('priority', '')}]"
                     reasoning = plan.get("reasoning", "")
+                    if data.get("correction_applied"):
+                        reasoning = f"[Correction: {data['correction_applied']}] {reasoning}"
 
                 elif channel == Channels.AGENT_INVENTORY:
                     alloc = data.get("allocation", {})
@@ -95,6 +99,19 @@ async def websocket_dashboard(websocket: WebSocket):
                     validation = data.get("validation", {})
                     action_text = f"Validation: {validation.get('status', 'UNKNOWN')}"
                     reasoning = validation.get("reason", "")
+
+                elif channel == Channels.AGENT_VERIFICATION:
+                    v = data.get("verification", {})
+                    feasible = v.get("feasible", True)
+                    confidence = v.get("confidence", "")
+                    replans = data.get("replan_count", 0)
+                    blocking = v.get("blocking", [])
+                    if feasible:
+                        action_text = f"✅ Plan verified feasible [{confidence}]"
+                        reasoning = f"{len(v.get('constraints', []))} constraint(s) checked — no blockers"
+                    else:
+                        action_text = f"⚠️ Infeasible — self-correcting (attempt {replans + 1})"
+                        reasoning = v.get("correction", "") or "; ".join(blocking[:2])
 
                 elif channel == Channels.AGENT_EXECUTION:
                     execution = data.get("execution", {})

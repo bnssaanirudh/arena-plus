@@ -28,6 +28,7 @@ class Channels:
     AGENT_VALIDATION = "agent.validation"
     AGENT_EXECUTION = "agent.execution"
     AGENT_MARKETING = "agent.marketing"  # autonomous flash-deal campaigns
+    AGENT_VERIFICATION = "agent.verification"  # RAG feasibility check + self-correction
     AGENT_PIPELINE = "agent.pipeline"  # aggregated pipeline status
 
 
