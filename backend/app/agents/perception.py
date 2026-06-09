@@ -7,32 +7,10 @@ Analyzes incoming telemetry to assess crowd surge risk using:
 Falls back to a simple heuristic if both are unavailable.
 """
 
-import json
-import os
 from loguru import logger
 
-from ..config import settings
 from ..ml.predictor import surge_predictor
-
-# Lazy Gemini import – only initialize if API key is available
-_gemini_model = None
-
-
-def _get_gemini_model():
-    global _gemini_model
-    if _gemini_model is not None:
-        return _gemini_model
-    if not settings.GEMINI_API_KEY:
-        return None
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        _gemini_model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        logger.info(f"Gemini model initialized: {settings.GEMINI_MODEL}")
-        return _gemini_model
-    except Exception as e:
-        logger.warning(f"Failed to initialize Gemini: {e}")
-        return None
+from ..llm import gemini
 
 
 class PerceptionAgent:
@@ -54,11 +32,10 @@ class PerceptionAgent:
         probability = ml_result["probability"]
         model_used = ml_result["model_used"]
 
-        # Stage 2: Gemini LLM Assessment (if API key is configured)
+        # Stage 2: Gemini qualitative assessment (if configured)
         llm_assessment = None
-        gemini = _get_gemini_model()
-        if gemini and settings.GEMINI_API_KEY:
-            llm_assessment = await self._gemini_assess(gemini, event_data, ml_result)
+        if gemini.is_available():
+            llm_assessment = await self._gemini_assess(event_data, ml_result)
 
         assessment_text = (
             llm_assessment if llm_assessment
@@ -73,11 +50,9 @@ class PerceptionAgent:
             "assessment": assessment_text,
         }
 
-    async def _gemini_assess(self, model, event_data: dict, ml_result: dict) -> str:
-        """Use Gemini to generate a qualitative assessment."""
-        prompt = f"""You are the Perception Agent for ArenaPulse, a stadium logistics intelligence system.
-
-An ML model has already assessed this event. Provide a brief (2-3 sentence) qualitative analysis.
+    async def _gemini_assess(self, event_data: dict, ml_result: dict) -> str:
+        """Use Gemini to generate a qualitative assessment. Returns None on failure."""
+        prompt = f"""An ML model has already assessed this event. Provide a brief (2-3 sentence) qualitative analysis.
 
 Event Data:
 - Type: {event_data.get('event_type', 'unknown')}
@@ -90,11 +65,12 @@ ML Assessment:
 - Surge Probability: {ml_result['probability']:.1%}
 - Model: {ml_result['model_used']}
 
-Provide your assessment as a concise paragraph. Focus on what the numbers mean operationally."""
+Focus on what the numbers mean operationally for stadium logistics."""
 
-        try:
-            response = await model.generate_content_async(prompt)
-            return response.text.strip()
-        except Exception as e:
-            logger.warning(f"Gemini assessment failed: {e}")
-            return None
+        return await gemini.generate_text(
+            prompt,
+            system_instruction=(
+                "You are the Perception Agent for ArenaPulse, an autonomous stadium "
+                "logistics intelligence system. Be concise and operational."
+            ),
+        )

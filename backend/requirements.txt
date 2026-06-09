@@ -1,23 +1,30 @@
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
+# Web framework — versions relaxed for compatibility with google-adk
+fastapi>=0.115.5
+uvicorn[standard]>=0.32.1
 python-dotenv==1.0.1
-pydantic==2.10.3
-pydantic-settings==2.6.1
+pydantic>=2.11
+pydantic-settings>=2.6.1
+python-multipart==0.0.20
+websockets>=14.1
+
+# Data infra
 elasticsearch==8.16.0
 httpx==0.28.1
 pandas>=2.0.0
 numpy>=1.24.0
-sse-starlette==2.1.3
-openai==1.57.4
-google-generativeai==0.8.3
+
+# Agent brain: Gemini 3 + Google Cloud Agent Builder (ADK)
+google-genai>=1.0.0
+google-adk>=2.0.0
+
+# Observability (Arize partner integration)
 arize-phoenix>=7.0.0
 opentelemetry-api>=1.20.0
 opentelemetry-sdk>=1.20.0
 opentelemetry-exporter-otlp>=1.20.0
+
+# Tooling / tests
+faker==33.1.0
+loguru>=0.7.0
 pytest==8.3.4
 pytest-asyncio==0.24.0
-httpx==0.28.1
-faker==33.1.0
-python-multipart==0.0.20
-websockets==14.1
-loguru>=0.7.0
