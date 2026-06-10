@@ -11,7 +11,7 @@ export default function OperatorCenter() {
   const [alertMsg, setAlertMsg] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8080';
+  const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
   useEffect(() => {
     const fetchCurrentSettings = async () => {
