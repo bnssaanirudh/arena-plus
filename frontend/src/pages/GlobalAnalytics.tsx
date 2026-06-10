@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Nav } from '../components/Nav';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
 import { BarChart3, TrendingUp, PieChart as PieIcon, RefreshCw, ChevronDown } from 'lucide-react';
 
@@ -15,7 +16,6 @@ interface ZoneData {
 }
 
 export default function GlobalAnalytics() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [selectedZone, setSelectedZone] = useState<string>('All');
   const [selectedPhase, setSelectedPhase] = useState<string>('Halftime');
   const [loading, setLoading] = useState(false);
@@ -56,35 +56,7 @@ export default function GlobalAnalytics() {
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-white text-black selection:bg-orange-500 selection:text-white">
-      {/* Navigation Overlay */}
-      <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
-        <div className="flex flex-col gap-8 md:gap-12 w-full max-w-4xl mx-auto mt-16 text-black">
-          <Link to="/" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Home</Link>
-          <Link to="/dashboard" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Dashboard</Link>
-          <Link to="/platform" className="bs-nav-link" onClick={() => setMenuOpen(false)}>The Platform</Link>
-          <Link to="/capabilities" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Capabilities</Link>
-          <Link to="/operations" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Case Studies</Link>
-          <Link to="/process" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Our Process</Link>
-          <Link to="/contact" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Contact</Link>
-        </div>
-      </div>
-
-      {/* Header */}
-      <header className="sticky top-0 left-0 w-full z-[80] bg-white/85 backdrop-blur-md border-b border-slate-200/80 flex justify-between items-center px-6 py-5 md:px-12 md:py-6">
-        <Link to="/" className="font-bold tracking-tight text-xl md:text-2xl uppercase flex items-center gap-2 text-black hover:text-orange-600 transition-colors">
-          ArenaPulse
-        </Link>
-        <button 
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-4 hover:opacity-70 transition-opacity uppercase font-medium text-xs md:text-sm tracking-widest text-black"
-        >
-          <span>{menuOpen ? 'Close' : 'Menu'}</span>
-          <div className="flex flex-col gap-[6px]">
-            <span className={`w-8 h-[2px] block bg-black transition-transform origin-center ${menuOpen ? 'rotate-45 translate-y-[8px]' : ''}`}></span>
-            <span className={`w-8 h-[2px] block bg-black transition-transform origin-center ${menuOpen ? '-rotate-45 -translate-y-[8px]' : ''}`}></span>
-          </div>
-        </button>
-      </header>
+      <Nav />
 
       {/* Hero Header */}
       <section className="bg-slate-50 border-b border-slate-200 py-16 px-6 md:px-12">

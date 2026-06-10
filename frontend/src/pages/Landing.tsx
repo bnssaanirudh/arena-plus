@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Nav } from '../components/Nav';
 
-const FadeInUp = ({ children, delay = 0, className = "" }: { children: React.ReactNode, delay?: number, className?: string }) => (
+const FadeInUp = ({ children, delay = 0, className = "" }: { children: ReactNode, delay?: number, className?: string }) => (
   <motion.div
     initial={{ opacity: 0, y: 40 }}
     whileInView={{ opacity: 1, y: 0 }}
@@ -15,52 +16,11 @@ const FadeInUp = ({ children, delay = 0, className = "" }: { children: React.Rea
 );
 
 export default function Landing() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   const tickerText = "AUTONOMOUS LOGISTICS ✦ MULTI-AGENT INTELLIGENCE ✦ CROWD TELEMETRY ✦ EVENT PREDICTION ✦ AUTONOMOUS LOGISTICS ✦ MULTI-AGENT INTELLIGENCE ✦ ";
 
   return (
     <div className="w-full min-h-screen flex flex-col relative bg-white text-black selection:bg-orange-500 selection:text-white">
-      
-      {/* Navigation Overlay */}
-      <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
-        <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-12 overflow-y-auto max-h-[85vh] pr-4 custom-scrollbar">
-          <Link to="/dashboard" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Dashboard</Link>
-          <Link to="/platform" className="bs-nav-link" onClick={() => setMenuOpen(false)}>The Platform</Link>
-          <Link to="/capabilities" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Capabilities</Link>
-          <Link to="/operations" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Case Studies</Link>
-          <Link to="/process" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Our Process</Link>
-          <Link to="/supply-hub" className="bs-nav-link" onClick={() => setMenuOpen(false)}>B2B Supply Hub</Link>
-          <Link to="/operator" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Command Center</Link>
-          <Link to="/contact" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Contact</Link>
-        </div>
-      </div>
-
-      {/* Header Overlay */}
-      <header className={`fixed top-0 left-0 w-full z-[100] flex justify-between items-center px-6 py-5 md:px-12 md:py-8 transition-all duration-300 ${menuOpen ? 'text-black' : scrolled ? 'bg-black/90 text-white backdrop-blur-md' : 'text-white'}`}>
-        <div className="font-bold tracking-tight text-xl md:text-2xl uppercase flex items-center gap-2 cursor-pointer z-50">
-          ArenaPulse
-        </div>
-        <button 
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="flex items-center gap-4 hover:opacity-70 transition-opacity uppercase font-medium text-xs md:text-sm tracking-widest z-50"
-        >
-          <span className="hidden md:block">{menuOpen ? 'Close' : 'Menu'}</span>
-          <div className="flex flex-col gap-[6px]">
-            <span className={`w-8 h-[2px] block transition-transform origin-center ${menuOpen ? 'rotate-45 translate-y-[8px] bg-black' : 'bg-white'}`}></span>
-            <span className={`w-8 h-[2px] block transition-transform origin-center ${menuOpen ? '-rotate-45 -translate-y-[8px] bg-black' : 'bg-white'}`}></span>
-          </div>
-        </button>
-      </header>
+      <Nav variant="landing" />
 
       {/* Full Bleed Hero */}
       <section className="relative w-full h-screen overflow-hidden bg-black">
