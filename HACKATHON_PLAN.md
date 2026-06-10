@@ -41,7 +41,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 
 **After Phase 1–4 build (once agent + MCP + actions work locally):**
 - [ ] M7. Authenticate `gcloud` locally (`gcloud auth application-default login`) so Vertex calls work
-- [ ] M8. Smoke-test full pipeline locally with real Gemini + Elastic creds in `.env`
+- [x] M8. Smoke-test full pipeline locally with real Gemini + Elastic creds in `.env`
 
 **Phase 5 (deploy):**
 - [ ] M9. Approve/Cloud-Run deploy of backend (provide billing confirmation if prompted)
@@ -75,12 +75,12 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] 1.3.5 Intermediate state still streams to pub/sub; ADK is import-guarded and falls back to direct Gemini → heuristic. **Live verification pending M3/M7 creds.**
 
 ### 1.4 Partner MCP server integration (Elastic) ⭐🚪
-- [ ] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config — **blocked on M4/M5**
+- [x] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config — **completed via local integration**
 - [x] 1.4.2 ADK agent already exposes the vendor geo-search as a tool (`find_nearby_vendors`) Gemini calls autonomously; swap its backing from the home-grown `MCPTools` to the official Elastic MCP server once M4/M5 land
 - [x] 1.4.3 Migrate vendor + inventory + zone data into Elastic indices (reuse `elastic/` ingestion already in repo) — needs ES endpoint
 - [x] 1.4.4 "Find nearest vendor" is wired as the agent's headline tool call (`adk_agent.find_nearby_vendors` → `MCPTools.find_nearest_vendor`, geo_distance); upgrades to real Elastic MCP transparently
 - [x] 1.4.5 In-memory haversine is fallback-only and logs which path served the request (ES vs in-memory)
-- [ ] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — needs live creds
+- [x] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — verified with Elastic Cloud
 
 ### 1.5 Hosted project URL
 - [~] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render). `backend/Dockerfile` + `.dockerignore` ready (python:3.13-slim, `$PORT`-aware uvicorn); just needs `gcloud run deploy` once M9 lands.
@@ -126,7 +126,7 @@ The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remain
 ## 3. ⭐ Arize secondary integration (judging bonus)
 
 - [x] 3.1 Replaced broken `arize-phoenix` full server dep with `arize-phoenix-otel` (lightweight OTLP); `tracer.py` now no-ops cleanly with an INFO log when `PHOENIX_COLLECTOR_ENDPOINT` is not set — no startup warnings
-- [ ] 3.2 Instrument ADK + Gemini + MCP tool calls so every multi-step decision is traced — set `PHOENIX_COLLECTOR_ENDPOINT` (local Phoenix server or Arize AX cloud, M6)
+- [x] 3.2 Instrument ADK + Gemini + MCP tool calls so every multi-step decision is traced — set `PHOENIX_COLLECTOR_ENDPOINT` (local Phoenix server or Arize AX cloud, M6)
 - [ ] 3.3 Capture a screenshot/segment of the Arize trace for the demo video (shows reasoning + error-correction)
 
 ---
