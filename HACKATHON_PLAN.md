@@ -34,7 +34,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 **Before/during Phase 1–2 build (provision now, in parallel):**
 - [ ] M1. Create **Google Cloud account + project**, enable billing ($300 free trial) → share **project ID**
 - [ ] M2. Enable **Vertex AI API**, **Cloud Run**, **Agent Builder** in that project
-- [ ] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`)
+- [x] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`) — **done: `gemini-3-flash-preview` (AI Studio); full pipeline smoke-tested (M8)**
 - [x] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
 - [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
 - [x] M6. (Secondary) Create a free **Arize AX** account → share **Space ID** + **API key**
@@ -72,7 +72,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] 1.3.2 Defined the ArenaPulse agent in ADK (`agents/adk_agent.py` — `LlmAgent` `arenapulse_coordinator`: instruction, Gemini 3 model, tool registry)
 - [x] 1.3.3 Registered the Elastic vendor-search as an ADK `FunctionTool` (`find_nearby_vendors`) the agent calls autonomously while planning
 - [x] 1.3.4 Planning brain runs through the ADK `Runner` (`plan_via_adk`); Inventory/Validation/Execution stay deterministic so the dashboard keeps structured stages — full multi-tool routing is a stretch
-- [x] 1.3.5 Intermediate state still streams to pub/sub; ADK is import-guarded and falls back to direct Gemini → heuristic. **Live verification pending M3/M7 creds.**
+- [x] 1.3.5 Intermediate state still streams to pub/sub; ADK is import-guarded and falls back to direct Gemini → heuristic. **Live-verified: ADK called `find_nearby_vendors` autonomously, full 8-stage pipeline completed (M8).**
 
 ### 1.4 Partner MCP server integration (Elastic) ⭐🚪
 - [x] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config — **completed via local integration**
