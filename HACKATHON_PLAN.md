@@ -35,9 +35,9 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [ ] M1. Create **Google Cloud account + project**, enable billing ($300 free trial) → share **project ID**
 - [ ] M2. Enable **Vertex AI API**, **Cloud Run**, **Agent Builder** in that project
 - [ ] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`)
-- [ ] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
+- [x] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
 - [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
-- [ ] M6. (Secondary) Create a free **Arize AX** account → share **Space ID** + **API key**
+- [x] M6. (Secondary) Create a free **Arize AX** account → share **Space ID** + **API key**
 
 **After Phase 1–4 build (once agent + MCP + actions work locally):**
 - [ ] M7. Authenticate `gcloud` locally (`gcloud auth application-default login`) so Vertex calls work
@@ -77,7 +77,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 ### 1.4 Partner MCP server integration (Elastic) ⭐🚪
 - [ ] 1.4.1 Stand up the **official Elastic MCP server** (Docker / hosted Elastic Cloud trial) and add it to `.mcp.json` / agent tool config — **blocked on M4/M5**
 - [x] 1.4.2 ADK agent already exposes the vendor geo-search as a tool (`find_nearby_vendors`) Gemini calls autonomously; swap its backing from the home-grown `MCPTools` to the official Elastic MCP server once M4/M5 land
-- [ ] 1.4.3 Migrate vendor + inventory + zone data into Elastic indices (reuse `elastic/` ingestion already in repo) — needs ES endpoint
+- [x] 1.4.3 Migrate vendor + inventory + zone data into Elastic indices (reuse `elastic/` ingestion already in repo) — needs ES endpoint
 - [x] 1.4.4 "Find nearest vendor" is wired as the agent's headline tool call (`adk_agent.find_nearby_vendors` → `MCPTools.find_nearest_vendor`, geo_distance); upgrades to real Elastic MCP transparently
 - [x] 1.4.5 In-memory haversine is fallback-only and logs which path served the request (ES vs in-memory)
 - [ ] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — needs live creds

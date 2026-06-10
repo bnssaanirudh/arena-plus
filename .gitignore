@@ -10,6 +10,7 @@ build/
 .pytest_cache/
 .mypy_cache/
 *.joblib
+backend/.env
 
 # Node / frontend
 node_modules/

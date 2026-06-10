@@ -33,12 +33,14 @@ export default function Landing() {
       
       {/* Navigation Overlay */}
       <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
-        <div className="flex flex-col gap-8 md:gap-12 w-full max-w-4xl mx-auto mt-16">
+        <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-12 overflow-y-auto max-h-[85vh] pr-4 custom-scrollbar">
           <Link to="/dashboard" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Dashboard</Link>
-          <a href="#intro" className="bs-nav-link" onClick={() => setMenuOpen(false)}>The Platform</a>
-          <a href="#sectors" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Capabilities</a>
-          <a href="#projects" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Case Studies</a>
-          <a href="#process" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Our Process</a>
+          <Link to="/platform" className="bs-nav-link" onClick={() => setMenuOpen(false)}>The Platform</Link>
+          <Link to="/capabilities" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Capabilities</Link>
+          <Link to="/operations" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Case Studies</Link>
+          <Link to="/process" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Our Process</Link>
+          <Link to="/supply-hub" className="bs-nav-link" onClick={() => setMenuOpen(false)}>B2B Supply Hub</Link>
+          <Link to="/operator" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Command Center</Link>
           <Link to="/contact" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Contact</Link>
         </div>
       </div>

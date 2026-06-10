@@ -3,14 +3,14 @@ import { useStore, type AgentAction, type VerificationInfo } from '../store/useS
 
 // ── Stage metadata ────────────────────────────────────────────────────────────
 const STAGES: Record<string, { idx: number; label: string; dot: string; text: string }> = {
-  pipeline:     { idx: 0, label: 'Pipeline',     dot: 'bg-slate-500',  text: 'text-slate-400'  },
-  perception:   { idx: 1, label: '① Perception', dot: 'bg-purple-500', text: 'text-purple-400' },
-  planning:     { idx: 2, label: '② Planning',   dot: 'bg-blue-500',   text: 'text-blue-400'   },
-  inventory:    { idx: 3, label: '③ Inventory',  dot: 'bg-yellow-500', text: 'text-yellow-400' },
-  validation:   { idx: 4, label: '④ Validation', dot: 'bg-green-500',  text: 'text-green-400'  },
-  verification: { idx: 5, label: '⑤ Verify',    dot: 'bg-indigo-500', text: 'text-indigo-400' },
-  execution:    { idx: 6, label: '⑥ Execution',  dot: 'bg-orange-500', text: 'text-orange-400' },
-  marketing:    { idx: 7, label: '⑦ Marketing',  dot: 'bg-pink-500',   text: 'text-pink-400'   },
+  pipeline:     { idx: 0, label: 'Pipeline',     dot: 'bg-slate-500',  text: 'text-slate-500'  },
+  perception:   { idx: 1, label: '① Perception', dot: 'bg-purple-600', text: 'text-purple-700' },
+  planning:     { idx: 2, label: '② Planning',   dot: 'bg-blue-600',   text: 'text-blue-700'   },
+  inventory:    { idx: 3, label: '③ Inventory',  dot: 'bg-yellow-600', text: 'text-yellow-750' },
+  validation:   { idx: 4, label: '④ Validation', dot: 'bg-green-600',  text: 'text-green-700'  },
+  verification: { idx: 5, label: '⑤ Verify',    dot: 'bg-indigo-600', text: 'text-indigo-700' },
+  execution:    { idx: 6, label: '⑥ Execution',  dot: 'bg-orange-600', text: 'text-orange-700' },
+  marketing:    { idx: 7, label: '⑦ Marketing',  dot: 'bg-pink-600',   text: 'text-pink-700'   },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -27,17 +27,17 @@ function StageRow({ action }: { action: AgentAction }) {
   const meta = STAGES[action.stage ?? ''];
   if (!meta) return null;
   return (
-    <div className="flex items-start gap-2 py-1 border-b border-white/5 last:border-0">
+    <div className="flex items-start gap-2 py-1 border-b border-slate-100 last:border-0">
       <span className={`shrink-0 mt-[3px] w-2 h-2 rounded-full ${meta.dot}`} />
       <div className="min-w-0 flex-1">
         <span className={`text-[10px] font-bold uppercase tracking-wider ${meta.text}`}>
           {meta.label}
         </span>
-        <p className="text-xs text-slate-300 truncate leading-tight mt-0.5">
+        <p className="text-xs text-slate-800 truncate leading-tight mt-0.5">
           {action.action}
         </p>
         {action.reasoning && (
-          <p className="text-[10px] text-slate-500 italic truncate leading-tight">
+          <p className="text-[10px] text-slate-500 italic truncate leading-tight mt-0.5">
             {action.reasoning}
           </p>
         )}
@@ -99,27 +99,27 @@ export function EventTimeline() {
           {groups.map((g) => (
             <div
               key={g.eventId}
-              className="shrink-0 w-[220px] bg-[#111] border border-white/10 rounded-lg flex flex-col overflow-hidden"
+              className="shrink-0 w-[220px] bg-slate-50 border border-slate-200 rounded-lg flex flex-col overflow-hidden"
             >
               {/* Card header */}
               <div
-                className={`px-3 py-2 flex items-center justify-between border-b border-white/10 ${
-                  g.completed ? 'bg-green-950/40' : 'bg-orange-950/30'
+                className={`px-3 py-2 flex items-center justify-between border-b border-slate-250 ${
+                  g.completed ? 'bg-green-50 text-green-950' : 'bg-orange-50 text-orange-950'
                 }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${
-                      g.completed ? 'bg-green-500' : 'bg-orange-500 animate-pulse'
+                      g.completed ? 'bg-green-600' : 'bg-orange-600 animate-pulse'
                     }`}
                   />
-                  <span className="font-mono text-[11px] font-bold text-white truncate">
+                  <span className="font-mono text-[11px] font-bold text-slate-800 truncate">
                     {shortId(g.eventId)}
                   </span>
                 </div>
                 <span
                   className={`text-[9px] font-bold uppercase tracking-widest ml-1 shrink-0 ${
-                    g.completed ? 'text-green-400' : 'text-orange-400'
+                    g.completed ? 'text-green-700' : 'text-orange-700'
                   }`}
                 >
                   {g.completed ? 'done' : `${g.stageCount}/7`}
@@ -133,10 +133,10 @@ export function EventTimeline() {
                 </span>
                 {g.verification && (
                   <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                    className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${
                       g.verification.feasible
-                        ? 'bg-indigo-900/50 text-indigo-300'
-                        : 'bg-amber-900/50 text-amber-300'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-250'
                     }`}
                     title={
                       g.verification.feasible

@@ -284,7 +284,7 @@ class TestVerificationAgent:
         from app.agents.verification import _retrieve_constraints
 
         # South Gate has a road_closure HIGH constraint — should be retrieved
-        hits = _retrieve_constraints("South Gate", "DISPATCH_RESOURCES")
+        hits = await _retrieve_constraints("South Gate", "DISPATCH_RESOURCES")
         ids = [c["id"] for c in hits]
         assert "C001" in ids  # road_closure for South Gate
 

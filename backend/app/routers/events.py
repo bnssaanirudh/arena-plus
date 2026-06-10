@@ -31,6 +31,22 @@ async def trigger_event(body: TriggerEventRequest = TriggerEventRequest()):
 
 @router.get("/history")
 async def event_history(limit: int = 50) -> List[Dict[str, Any]]:
+    try:
+        from ..elastic.client import es_client
+        # Query Elasticsearch crowd_events index sorted by timestamp descending
+        query = {
+            "query": {"match_all": {}},
+            "sort": [{"timestamp": {"order": "desc"}}],
+            "size": min(limit, 100)
+        }
+        res = await es_client.search(index="crowd_events", body=query)
+        hits = [hit["_source"] for hit in res.get("hits", {}).get("hits", [])]
+        if hits:
+            return hits
+    except Exception:
+        # Fall back to in-memory history
+        pass
+
     return pubsub.get_telemetry_history(limit=min(limit, 100))
 
 

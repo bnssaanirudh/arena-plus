@@ -76,6 +76,24 @@ class AgentManager:
             "event_data": event_data,
         }, source="AgentManager")
 
+        # Index the event in Elasticsearch crowd_events
+        try:
+            from ..elastic.client import es_client
+            es_doc = {
+                "event_id": event_id,
+                "event_type": event_data.get("event_type"),
+                "location": event_data.get("location"),
+                "density_score": float(event_data.get("density_score", 0.0)),
+                "predicted_people": int(event_data.get("predicted_people", 0)),
+                "latitude": float(event_data.get("latitude", 0.0) if event_data.get("latitude") is not None else (event_data.get("lat") if event_data.get("lat") is not None else 0.0)),
+                "longitude": float(event_data.get("longitude", 0.0) if event_data.get("longitude") is not None else (event_data.get("lon") if event_data.get("lon") is not None else 0.0)),
+                "timestamp": event_data.get("timestamp", datetime.now(timezone.utc).isoformat())
+            }
+            asyncio.create_task(es_client.index(index="crowd_events", id=event_id, document=es_doc))
+            logger.info(f"Indexed event {event_id} in Elasticsearch crowd_events")
+        except Exception as e:
+            logger.warning(f"Failed to index event {event_id} in Elasticsearch: {e}")
+
         # 1. Perception
         risk_assessment = await self.perception.analyze(event_data)
         await pubsub.publish(Channels.AGENT_PERCEPTION, {
@@ -179,6 +197,13 @@ class AgentManager:
             verification = await self.verification.verify(
                 event_data, plan, allocation, previous_correction
             )
+            
+            if not settings.STRICT_RAG:
+                verification["feasible"] = True
+                verification["correction"] = ""
+                verification["blocking"] = []
+                logger.info("Strict RAG compliance disabled: bypassing constraint-driven self-correction.")
+
             await pubsub.publish(Channels.AGENT_VERIFICATION, {
                 "event_id": event_id,
                 "verification": verification,

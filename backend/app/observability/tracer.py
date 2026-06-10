@@ -34,11 +34,17 @@ def setup_phoenix() -> None:
     try:
         from phoenix.otel import register  # arize-phoenix-otel
 
+        headers = {}
+        api_key = os.environ.get("PHOENIX_API_KEY", "")
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
         tracer_provider = register(
             project_name="arenapulse",
             endpoint=endpoint,
+            headers=headers
         )
-        logger.info(f"Arize Phoenix OTel tracing active → {endpoint}")
+        logger.info(f"Arize Phoenix OTel tracing active → {endpoint} (authenticated={bool(api_key)})")
 
         # ── Instrument Gemini (google-genai) if available ──────────────────
         try:

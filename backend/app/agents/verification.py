@@ -115,19 +115,39 @@ _SYSTEM_INSTRUCTION = (
 )
 
 
-def _retrieve_constraints(zone: str, action: str) -> List[Dict[str, Any]]:
-    """Retrieve relevant constraints for a zone + action.
+async def _retrieve_constraints(zone: str, action: str) -> List[Dict[str, Any]]:
+    """Retrieve relevant constraints for a zone + action from Elasticsearch (BM25) with in-memory fallback."""
+    try:
+        from ..elastic.client import es_client
+        # Query Elasticsearch if connection is active and index exists
+        query = {
+            "query": {
+                "bool": {
+                    "should": [
+                        {"match": {"zone": {"query": zone, "boost": 2.0}}},
+                        {"match": {"description": f"{zone} {action}"}},
+                        {"term": {"severity": "HIGH"}}
+                    ]
+                }
+            },
+            "size": 5
+        }
+        res = await es_client.search(index="supply_constraints", body=query)
+        hits = []
+        for hit in res.get("hits", {}).get("hits", []):
+            hits.append(hit["_source"])
+        if hits:
+            logger.info(f"Retrieved {len(hits)} constraints from Elasticsearch BM25 query")
+            return hits
+    except Exception as e:
+        logger.warning(f"Failed to query supply_constraints in Elasticsearch: {e}. Falling back to in-memory constraints.")
 
-    In-memory keyword match today. Replace this function body with an
-    Elastic ``_search`` (BM25 or kNN vector) call when ES is available —
-    the caller and schema stay identical.
-    """
+    # Local fallback
     zone_lower = zone.lower()
     action_lower = action.lower()
     hits = []
     for c in _CONSTRAINTS:
         c_zone = c["zone"].lower()
-        # Match on zone keyword overlap OR general constraints + high-resource actions
         zone_match = c_zone in zone_lower or zone_lower in c_zone or c_zone == "general"
         action_match = (
             action_lower in ("dispatch_resources", "evacuate_zone")
@@ -135,7 +155,7 @@ def _retrieve_constraints(zone: str, action: str) -> List[Dict[str, Any]]:
         )
         if zone_match or (action_match and c["severity"] != "LOW"):
             hits.append(c)
-    return hits[:5]  # cap at 5 — same as ES size param
+    return hits[:5]  # cap at 5
 
 
 def _format_constraints(constraints: List[Dict[str, Any]]) -> str:
@@ -174,7 +194,7 @@ class VerificationAgent:
 
         zone = event_data.get("location", "General")
         action = plan.get("action", "MONITOR")
-        constraints = _retrieve_constraints(zone, action)
+        constraints = await _retrieve_constraints(zone, action)
 
         result = await self._gemini_verify(zone, action, plan, allocation, constraints, previous_correction)
         source = "gemini"

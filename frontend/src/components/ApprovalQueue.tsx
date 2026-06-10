@@ -4,10 +4,17 @@ import { useStore, type PendingApproval } from '../store/useStore';
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
 const ACTION_COLOR: Record<string, string> = {
-  EVACUATE_ZONE: 'text-red-400 border-red-700',
-  ALERT_SECURITY: 'text-orange-400 border-orange-700',
-  DISPATCH_RESOURCES: 'text-yellow-400 border-yellow-700',
-  REROUTE_CROWD: 'text-blue-400 border-blue-700',
+  EVACUATE_ZONE: 'text-red-950 border-red-200 bg-red-50/80',
+  ALERT_SECURITY: 'text-orange-950 border-orange-200 bg-orange-50/80',
+  DISPATCH_RESOURCES: 'text-amber-950 border-amber-200 bg-amber-50/80',
+  REROUTE_CROWD: 'text-blue-950 border-blue-200 bg-blue-50/80',
+};
+
+const ACTION_LABEL_COLOR: Record<string, string> = {
+  EVACUATE_ZONE: 'text-red-700',
+  ALERT_SECURITY: 'text-orange-700',
+  DISPATCH_RESOURCES: 'text-amber-700',
+  REROUTE_CROWD: 'text-blue-700',
 };
 
 async function sendDecision(event_id: string, approved: boolean): Promise<boolean> {
@@ -28,7 +35,8 @@ function ApprovalCard({ approval }: { approval: PendingApproval }) {
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [done, setDone] = useState<'approved' | 'rejected' | null>(null);
 
-  const colorClass = ACTION_COLOR[approval.action] ?? 'text-white border-slate-600';
+  const styleClass = ACTION_COLOR[approval.action] ?? 'text-slate-900 border-slate-200 bg-slate-50/80';
+  const labelColor = ACTION_LABEL_COLOR[approval.action] ?? 'text-slate-800';
 
   async function decide(approved: boolean) {
     setBusy(approved ? 'approve' : 'reject');
@@ -42,37 +50,37 @@ function ApprovalCard({ approval }: { approval: PendingApproval }) {
 
   if (done) {
     return (
-      <div className={`p-3 rounded-lg border text-xs font-bold uppercase tracking-widest opacity-40 ${colorClass}`}>
+      <div className={`p-3 rounded-lg border text-xs font-bold uppercase tracking-widest opacity-60 ${styleClass}`}>
         {approval.action} — {done}
       </div>
     );
   }
 
   return (
-    <div className={`p-3 rounded-lg border bg-red-950/40 flex flex-col gap-2 ${colorClass}`}>
+    <div className={`p-4 rounded-xl border flex flex-col gap-2.5 shadow-sm ${styleClass}`}>
       <div className="flex justify-between items-start">
-        <span className={`font-bold text-sm uppercase tracking-wide ${colorClass.split(' ')[0]}`}>
-          ⚠️ {approval.action}
+        <span className={`font-bold text-sm uppercase tracking-wide flex items-center gap-1.5 ${labelColor}`}>
+          ⚠️ {approval.action.replace('_', ' ')}
         </span>
-        <span className="text-xs text-red-600">
+        <span className="text-[10px] text-slate-500 font-mono font-medium">
           {new Date(approval.timestamp).toLocaleTimeString()}
         </span>
       </div>
-      <p className="text-xs text-red-300/70 font-mono truncate">
+      <p className="text-xs text-slate-600 font-mono truncate">
         Event {approval.event_id.slice(0, 12)}…
       </p>
       <div className="flex gap-2 mt-1">
         <button
           onClick={() => decide(true)}
           disabled={busy !== null}
-          className="flex-1 py-1.5 text-xs font-bold uppercase bg-green-700 hover:bg-green-600 disabled:opacity-50 rounded transition-colors"
+          className="flex-1 py-2 text-xs font-bold uppercase bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 rounded-lg transition-colors cursor-pointer shadow-sm"
         >
           {busy === 'approve' ? '…' : '✅ Approve'}
         </button>
         <button
           onClick={() => decide(false)}
           disabled={busy !== null}
-          className="flex-1 py-1.5 text-xs font-bold uppercase bg-red-800 hover:bg-red-700 disabled:opacity-50 rounded transition-colors"
+          className="flex-1 py-2 text-xs font-bold uppercase bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50 rounded-lg transition-colors cursor-pointer shadow-sm"
         >
           {busy === 'reject' ? '…' : '🚫 Reject'}
         </button>
@@ -86,7 +94,7 @@ export function ApprovalQueue() {
 
   if (pendingApprovals.length === 0) {
     return (
-      <p className="text-red-900 text-sm text-center py-6 italic">
+      <p className="text-red-700/80 text-xs text-center py-8 italic font-light">
         No actions awaiting approval
       </p>
     );

@@ -1,6 +1,9 @@
 import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")
@@ -40,6 +43,9 @@ class Settings(BaseSettings):
     APPROVAL_REQUIRED: bool = os.getenv("APPROVAL_REQUIRED", "false").lower() == "true"
     # A dispatch is "high impact" once requested water+food exceeds this threshold.
     APPROVAL_RESOURCE_THRESHOLD: int = int(os.getenv("APPROVAL_RESOURCE_THRESHOLD", "5000"))
+    
+    # Strict RAG compliance. When True, constraints verification can trigger replanning.
+    STRICT_RAG: bool = os.getenv("STRICT_RAG", "true").lower() == "true"
 
     # ML Model
     ML_MODEL_PATH: str = os.path.join(

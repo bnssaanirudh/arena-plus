@@ -107,9 +107,15 @@ export default function Dashboard() {
       
       {/* Navigation Overlay */}
       <div className={`bs-nav-overlay ${menuOpen ? 'open' : ''}`}>
-        <Link to="/" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Home</Link>
-        <a href="#" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Status</a>
-        <a href="#" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Global Analytics</a>
+        <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto mt-12 overflow-y-auto max-h-[85vh] pr-4 custom-scrollbar">
+          <Link to="/" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Home</Link>
+          <Link to="/system-status" className="bs-nav-link" onClick={() => setMenuOpen(false)}>System Status</Link>
+          <Link to="/analytics" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Global Analytics</Link>
+          <Link to="/capabilities" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Capabilities</Link>
+          <Link to="/operations" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Case Studies</Link>
+          <Link to="/supply-hub" className="bs-nav-link" onClick={() => setMenuOpen(false)}>B2B Supply Hub</Link>
+          <Link to="/operator" className="bs-nav-link" onClick={() => setMenuOpen(false)}>Command Center</Link>
+        </div>
       </div>
 
       {/* Absolute Header Overlay */}
@@ -176,19 +182,20 @@ export default function Dashboard() {
       </div>
 
       {/* Content Grid */}
-      <section className="w-full flex-1 flex flex-col bg-white text-black p-6 lg:p-8">
-        <h2 className="text-4xl lg:text-5xl font-black uppercase mb-8 tracking-tight shrink-0">System Status</h2>
+      <section className="w-full flex-1 flex flex-col bg-[#fcfcfc] text-[#111111] p-6 lg:p-8">
+        <h2 className="text-4xl lg:text-5xl font-black uppercase mb-8 tracking-tight shrink-0 text-black flex items-center gap-3">
+          <span className="w-3 h-3 rounded-full bg-orange-500 animate-ping"></span>
+          System Operations
+        </h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 bg-[#f8f9fa] border-b-2 border-slate-300 p-6 flex flex-col h-[500px] lg:h-[650px]">
-            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-slate-400 shrink-0">Global Analytics</h3>
+          <div className="lg:col-span-8 bg-white border border-slate-200/80 p-6 flex flex-col h-[500px] lg:h-[650px] rounded-xl shadow-md">
             <div className="flex-1 min-h-0">
               <Analytics />
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#111] text-white border-b-2 border-slate-800 p-6 flex flex-col h-[500px] lg:h-[650px]">
-            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-orange-500 shrink-0">Active Agents</h3>
+          <div className="lg:col-span-4 bg-white border border-slate-200/80 p-6 flex flex-col h-[500px] lg:h-[650px] rounded-xl shadow-md">
             <div className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
               <AgentPanel />
             </div>
@@ -196,9 +203,9 @@ export default function Dashboard() {
         </div>
 
         {/* Second row — Agent Reasoning Timeline (full width) */}
-        <div className="mt-8 bg-[#0b0b0b] border border-white/10 p-6 flex flex-col h-[380px]">
-          <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-white shrink-0 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+        <div className="mt-8 bg-white border border-slate-200/80 p-6 flex flex-col h-[380px] rounded-xl shadow-md">
+          <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-black shrink-0 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
             Agent Reasoning Timeline
             <span className="ml-2 text-xs font-normal text-slate-500 normal-case tracking-normal">
               per-event pipeline · scroll →
@@ -211,9 +218,9 @@ export default function Dashboard() {
 
         {/* Third row — Approval Queue + Campaigns + Restock */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">
-          <div className="lg:col-span-4 bg-red-950/30 border border-red-800/40 p-6 flex flex-col h-[400px]">
-            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-red-400 shrink-0 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          <div className="lg:col-span-4 bg-red-50/40 border border-red-200/60 p-6 flex flex-col h-[400px] rounded-xl shadow-md">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-red-600 shrink-0 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
               Approval Queue
             </h3>
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
@@ -221,9 +228,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#0a1628] border border-blue-900/40 p-6 flex flex-col h-[400px]">
-            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-blue-400 shrink-0 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+          <div className="lg:col-span-4 bg-blue-50/40 border border-blue-200/60 p-6 flex flex-col h-[400px] rounded-xl shadow-md">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-blue-600 shrink-0 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
               Autonomous Campaigns
             </h3>
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
@@ -231,9 +238,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="lg:col-span-4 bg-[#0f1a0f] border border-green-900/40 p-6 flex flex-col h-[400px]">
-            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-green-400 shrink-0 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          <div className="lg:col-span-4 bg-green-50/40 border border-green-200/60 p-6 flex flex-col h-[400px] rounded-xl shadow-md">
+            <h3 className="text-xl font-bold uppercase mb-4 tracking-widest text-green-600 shrink-0 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
               B2B Restock Orders
             </h3>
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">

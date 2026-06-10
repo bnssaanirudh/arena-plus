@@ -31,6 +31,8 @@ INDEXES = {
                 "location": {"type": "keyword"},
                 "density_score": {"type": "float"},
                 "predicted_people": {"type": "integer"},
+                "latitude": {"type": "float"},
+                "longitude": {"type": "float"},
                 "timestamp": {"type": "date"}
             }
         }
@@ -43,6 +45,17 @@ INDEXES = {
                 "action": {"type": "text"},
                 "reasoning": {"type": "text"},
                 "timestamp": {"type": "date"}
+            }
+        }
+    },
+    "supply_constraints": {
+        "mappings": {
+            "properties": {
+                "id": {"type": "keyword"},
+                "zone": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+                "type": {"type": "keyword"},
+                "severity": {"type": "keyword"},
+                "description": {"type": "text"}
             }
         }
     }

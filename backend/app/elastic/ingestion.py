@@ -24,5 +24,58 @@ async def ingest_vendors():
     except Exception as e:
         logger.error(f"Failed to bulk ingest vendors: {e}")
 
+async def ingest_constraints():
+    from ..agents.verification import _CONSTRAINTS
+    operations = []
+    for constraint in _CONSTRAINTS:
+        operations.append({
+            "index": {"_index": "supply_constraints", "_id": constraint["id"]}
+        })
+        operations.append(constraint.copy())
+        
+    try:
+        if operations:
+            res = await es_client.bulk(operations=operations)
+            if res.get("errors"):
+                logger.error("Errors occurred during supply constraints ingestion")
+            else:
+                logger.info(f"Successfully ingested {len(_CONSTRAINTS)} supply constraints")
+    except Exception as e:
+        logger.error(f"Failed to bulk ingest supply constraints: {e}")
+
+async def ingest_stadium_zones():
+    from ..simulator.events import ZONES
+    ZONE_CAPACITIES = {
+        "North Gate": 15000,
+        "South Gate": 15000,
+        "East Gate": 12000,
+        "West Gate": 12000,
+        "Food Court": 8000,
+        "Merchandise Zone": 5000,
+        "Parking": 20000,
+    }
+    operations = []
+    for zone in ZONES:
+        operations.append({
+            "index": {"_index": "stadium_zones", "_id": zone}
+        })
+        operations.append({
+            "zone_name": zone,
+            "capacity": ZONE_CAPACITIES.get(zone, 10000),
+            "current_attendance": 0
+        })
+        
+    try:
+        if operations:
+            res = await es_client.bulk(operations=operations)
+            if res.get("errors"):
+                logger.error("Errors occurred during stadium zones ingestion")
+            else:
+                logger.info(f"Successfully ingested {len(ZONES)} stadium zones")
+    except Exception as e:
+        logger.error(f"Failed to bulk ingest stadium zones: {e}")
+
 async def run_initial_ingestion():
     await ingest_vendors()
+    await ingest_constraints()
+    await ingest_stadium_zones()

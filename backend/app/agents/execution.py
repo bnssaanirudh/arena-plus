@@ -107,6 +107,12 @@ class ExecutionAgent:
             logger.info(f"  [DRY_RUN] Would dispatch {alloc['take_water']} water, "
                         f"{alloc['take_food']} food from {alloc['vendor_id']}")
 
+            await MCPTools.record_agent_action(
+                agent_name="ExecutionAgent",
+                action=f"[DRY_RUN] Dispatched {alloc['take_water']} water and "
+                       f"{alloc['take_food']} food from {alloc['vendor_id']}",
+                reasoning="Approved allocation (Dry Run)"
+            )
             await self._log_decision(
                 "DRY_RUN_DISPATCH",
                 f"Would dispatch {alloc['take_water']} water and "
@@ -114,6 +120,13 @@ class ExecutionAgent:
             )
 
         restock_orders = _build_restock_orders(validation["approved_allocations"])
+        for order in restock_orders:
+            await MCPTools.record_agent_action(
+                agent_name="ExecutionAgent",
+                action=f"[DRY_RUN] Restock order {order['order_id']}: {order['quantity']} {order['item']} "
+                       f"for {order['vendor_name']} from {order['supplier']}",
+                reasoning="Replenish stock depleted by dispatch (Dry Run)",
+            )
         return {
             "status": "DRY_RUN",
             "planned_allocations": dry_results,
