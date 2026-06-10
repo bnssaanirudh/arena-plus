@@ -44,7 +44,7 @@ Run from `backend/`. The trained model lands in the top-level `models/` dir (not
 ## Architecture
 
 ### Backend data flow (the core loop)
-1. **`simulator/engine.py`** (`SimulatorEngine`) — on startup (`SIMULATION_ACTIVE=True`), loops every `SIMULATION_INTERVAL_SECONDS` (default 5s). Each tick generates a random telemetry event, publishes it to the `arena:telemetry:raw` channel, and fires `agent_manager.process_event(event)` as a background task.
+1. **`simulator/engine.py`** (`SimulatorEngine`) — on startup (`SIMULATION_ACTIVE=True`), loops every `SIMULATION_INTERVAL_SECONDS` (default 5s). Each tick generates a random telemetry event, publishes it to the `arena:telemetry:raw` channel, and fires `agent_manager.process_event(event)` as a background task. **`SIMULATION_ACTIVE` is set to `false` in `backend/.env`** — the auto-simulator is disabled to preserve Gemini API quota (each pipeline run = ~4 Gemini calls; 5 RPM limit on the free tier is exhausted in seconds otherwise). Use manual triggers (`POST /api/v1/events/trigger`) or the scripted demo cascade (`POST /api/v1/events/demo`) instead.
 2. **`agents/manager.py`** (`AgentManager`) — state machine: **Perception → Planning → Inventory → Validation → Verification (RAG loop) → [approval gate] → Execution → Marketing**. Publishes each stage to its pub/sub channel. Short-circuits on `MONITOR`. The verification step can self-correct (re-run Planning+Inventory+Validation) up to `MAX_REPLANS=2` times when the plan is infeasible. When `APPROVAL_REQUIRED` and plan is high-impact, pauses at `PENDING_APPROVAL`; `_finalize()` is shared by auto and post-approval paths.
 3. **`infra/pubsub.py`** (`pubsub`) — thin JSON+timestamp layer over **`infra/mock_redis.py`** (an in-memory async fake Redis). Channel names live in the `Channels` class. Raw telemetry events are kept in a 100-event in-memory ring buffer (`_telemetry_history`) served by `GET /api/v1/events/history`.
 4. **`routers/websockets.py`** — `/api/v1/ws/dashboard` subscribes to the raw telemetry channel + all agent channels, multiplexes them into one stream, and pushes formatted messages to the browser.
@@ -75,7 +75,9 @@ The system runs with **nothing external configured**:
 When adding features, preserve this zero-external-deps property — credentials should *upgrade* behavior, never be *required* to boot.
 
 ### Config (`backend/app/config.py`)
-Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")`. Key flags: `SIMULATION_ACTIVE`, `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`, `STRICT_RAG` (default true — RAG self-correction triggers on infeasible plans). Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (default `gemini-3-pro-preview`), `GEMINI_API_KEY`. Agent: `USE_ADK` (default true — route planning through the ADK agent when available), `APPROVAL_REQUIRED` (default false), `APPROVAL_RESOURCE_THRESHOLD` (default 5000). See `backend/.env.example`. `STRICT_RAG` and `APPROVAL_REQUIRED` can be toggled at runtime via `POST /api/v1/status/settings`.
+Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `model_config = SettingsConfigDict(case_sensitive=True, extra="ignore")`. Key flags: `SIMULATION_ACTIVE` (**set to `false` in `.env`** — see simulator note above), `SIMULATION_INTERVAL_SECONDS`, `DRY_RUN`, `CORS_ORIGINS`, `ML_MODEL_PATH`, `STRICT_RAG` (default true — RAG self-correction triggers on infeasible plans). Gemini: `GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION`, `GEMINI_MODEL` (**currently `gemini-3-flash-preview`** — the correct AI Studio API ID; `gemini-3-flash` 404s on AI Studio), `GEMINI_API_KEY`. Agent: `USE_ADK` (default true — route planning through the ADK agent when available), `APPROVAL_REQUIRED` (default false), `APPROVAL_RESOURCE_THRESHOLD` (default 5000). See `backend/.env.example`. `STRICT_RAG` and `APPROVAL_REQUIRED` can be toggled at runtime via `POST /api/v1/status/settings`.
+
+**Gemini model IDs on AI Studio** (confirmed working with the project key): `gemini-3-flash-preview` (5 RPM / 20 RPD — primary, satisfies hackathon "Gemini 3" requirement), `gemini-3.1-flash-lite` (15 RPM / 500 RPD — dev fallback if quota runs out), `gemini-3.5-flash` (5 RPM / 20 RPD). The `google-genai` SDK expects the short form without the `models/` prefix.
 
 ### REST routers (`backend/app/routers/`, prefix `/api/v1`)
 - `events` — `GET /history` (last 100 events, newest-first, `?limit=`), **`POST /trigger`** (inject single event + run pipeline), **`POST /demo`** (fire scripted 5-event surge cascade — background task, streams over WS)
@@ -117,9 +119,10 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 - **Frontend** — `frontend/vercel.json` (Vite framework preset, SPA rewrite to `/index.html`). Set `VITE_API_BASE` to the deployed backend URL in the Vercel project's env vars (see `frontend/.env.example`). Ready for Vercel once M10 lands.
 
 ## Known issues / tech debt
-- **Live ADK + Elastic verification pending** — ADK and Elastic MCP paths are wired but untested with real creds; blocked on M3 (Gemini model id) and M4/M5 (Elastic endpoint).
+- **Live ADK + Elastic verification pending** — ADK path is live and verified with Gemini (M3 resolved); Elastic MCP tool calls fall back to in-memory haversine because ES isn't running locally. Blocked on M4/M5 (Elastic Cloud endpoint + confirm Elastic MCP server).
 - **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic call when ES creds land.
 - **OTel version pin** — `opentelemetry-sdk<1.42` required by `google-adk 2.x`; `arize-phoenix-otel` (lightweight) used instead of the full `arize-phoenix` server package to avoid the conflict. Full Phoenix UI traces require M6 (Arize AX creds) + setting `PHOENIX_COLLECTOR_ENDPOINT`.
+- **Gemini quota** — Free tier is 5 RPM / 20 RPD for `gemini-3-flash-preview`. Auto-simulator is disabled (`SIMULATION_ACTIVE=false`) to avoid burning quota. Use manual triggers only during dev. Swap to `gemini-3.1-flash-lite` (500 RPD) if daily limit is hit.
 
 ## Knowledge graph (code-review-graph MCP)
 
