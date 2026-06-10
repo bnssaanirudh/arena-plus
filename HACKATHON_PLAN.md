@@ -126,7 +126,7 @@ The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remain
 ## 3. ⭐ Arize secondary integration (judging bonus)
 
 - [x] 3.1 `arize-phoenix-otel` (lightweight OTLP) installed; `arize-phoenix` full server removed (breaks Python 3.13 import chain); `openinference-instrumentation-google-genai` added — Gemini calls now auto-instrumented. `tracer.py` no-ops cleanly when `PHOENIX_COLLECTOR_ENDPOINT` unset.
-- [~] 3.2 Tracer boots successfully (authenticated=True, Gemini instrumented). **Blocked:** 404 on export — `PHOENIX_COLLECTOR_ENDPOINT` set to web-UI URL, not OTLP ingest URL. Fix: go to Arize AX → Settings → API Keys → copy the OTLP collector endpoint (format: `https://otlp.arize.com/v1` or similar) → update `.env`.
+- [x] 3.2 Traces export confirmed — endpoint must be space-scoped: `https://app.phoenix.arize.com/s/<space>/v1/traces` with `Authorization: Bearer <key>`. Gemini calls auto-instrumented via `openinference-instrumentation-google-genai`. No export errors on flush.
 - [ ] 3.3 Capture a screenshot/segment of the Arize trace for the demo video (shows reasoning + error-correction)
 
 ---

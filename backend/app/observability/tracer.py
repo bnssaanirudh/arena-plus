@@ -34,15 +34,14 @@ def setup_phoenix() -> None:
     try:
         from phoenix.otel import register  # arize-phoenix-otel
 
-        headers = {}
         api_key = os.environ.get("PHOENIX_API_KEY", "")
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
+        # Space-scoped endpoint (app.phoenix.arize.com/s/<space>/v1/traces) requires
+        # Authorization: Bearer — not the generic api_key header.
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         tracer_provider = register(
             project_name="arenapulse",
             endpoint=endpoint,
-            headers=headers
+            headers=headers,
         )
         logger.info(f"Arize Phoenix OTel tracing active → {endpoint} (authenticated={bool(api_key)})")
 
