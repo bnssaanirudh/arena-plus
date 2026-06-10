@@ -37,7 +37,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`) — **done: `gemini-3-flash-preview` (AI Studio); full pipeline smoke-tested (M8)**
 - [x] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
 - [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
-- [x] M6. (Secondary) Create a free **Arize AX** account → creds in `.env`; `arize-phoenix-otel` + `openinference-instrumentation-google-genai` installed; tracer boots authenticated=True + Gemini instrumented. **Blocked:** `PHOENIX_COLLECTOR_ENDPOINT` must be set to the OTLP ingest URL from Arize AX Settings (not the web UI URL — see Known issues).
+- [x] M6. (Secondary) Create a free **Arize AX** account → traces exporting to `app.phoenix.arize.com/s/akshatagrawal-work`; Gemini calls auto-instrumented. Endpoint: `https://app.phoenix.arize.com/s/<space>/v1/traces` + `Authorization: Bearer <key>`.
 
 **After Phase 1–4 build (once agent + MCP + actions work locally):**
 - [ ] M7. Authenticate `gcloud` locally (`gcloud auth application-default login`) so Vertex calls work

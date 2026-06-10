@@ -89,7 +89,6 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 - `websockets` — `/ws/dashboard` multiplex WS. Every `agent_action` now carries `event_id` + `stage` (pipeline stage name) for the EventTimeline. Rich typed messages: `flash_deal`, `restock_orders`, `approval_needed`, `approval_resolved`, `verification`, `restock_ack` — consumed by the frontend panels.
 - `mcp` — current home-grown tools (nearest vendor, overloaded zones, inventory) over ES with in-memory haversine fallback. **Being migrated to the official Elastic MCP server** as the agent's tool layer (HACKATHON_PLAN 1.4).
 
-### Observability
 `observability/tracer.py` `setup_phoenix()` — uses `arize-phoenix-otel` (lightweight OTLP, no OTel version conflict with google-adk). No-ops cleanly (INFO log only) when `PHOENIX_COLLECTOR_ENDPOINT` is not set. Set it to the **OTLP ingest URL** from Arize AX Settings (e.g. `https://otlp.arize.com/v1`) — **not** the web-UI space URL (`app.arize.com/s/...`). `opentelemetry-sdk` pinned `<1.42` for `google-adk 2.x` compat. **Critical:** do NOT install `arize-phoenix` (full server) — it breaks `from phoenix.otel import register` on Python 3.13 via a broken `phoenix.evals.models` import chain. Use only `arize-phoenix-otel`. `openinference-instrumentation-google-genai` is installed and auto-instruments all Gemini calls once `PHOENIX_COLLECTOR_ENDPOINT` is set. **Correct endpoint format for Arize-hosted Phoenix:** `https://app.phoenix.arize.com/s/<space>/v1/traces` (space-scoped) with `Authorization: Bearer <key>` — the root `/v1/traces` and `api_key` header both return 401.
 
 ### Frontend (`frontend/src/`)
@@ -122,6 +121,7 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 - **Elastic MCP server pending (M5)** — ADK + Elastic Cloud creds working (geo_distance queries hit real ES); `find_nearby_vendors` still backed by local `MCPTools.find_nearest_vendor`. Swap to the official Elastic MCP server once M5 (Docker image / hosted endpoint) confirmed.
 - **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic BM25/kNN call — interface unchanged, ES creds are live.
 - **Arize traces working** — Endpoint `https://app.phoenix.arize.com/s/akshatagrawal-work/v1/traces`, auth `Authorization: Bearer <key>`. Gemini calls auto-instrumented. Check `app.phoenix.arize.com/s/akshatagrawal-work` for the `arenapulse` project traces.
+- **Gemini 503 (transient)** — Free tier `gemini-3-flash-preview` hits 503 under high demand. Swap `GEMINI_MODEL=gemini-3.1-flash-lite` in `.env` (500 RPD) if it persists.
 - **OTel version pin** — `opentelemetry-sdk<1.42` required by `google-adk 2.x`; all OTel packages pinned to 1.41.1. Do NOT run `pip install --upgrade opentelemetry-*` — it will pull 1.42.x and break ADK.
 - **Gemini quota** — Free tier is 5 RPM / 20 RPD for `gemini-3-flash-preview`. Auto-simulator is disabled (`SIMULATION_ACTIVE=false`) to avoid burning quota. Use manual triggers only during dev. Swap to `gemini-3.1-flash-lite` (500 RPD) if daily limit is hit.
 
