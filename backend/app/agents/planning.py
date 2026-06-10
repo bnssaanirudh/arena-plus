@@ -54,6 +54,43 @@ _SYSTEM_INSTRUCTION = (
 )
 
 
+async def recall_past_decisions(zone: str, limit: int = 3) -> str:
+    """Institutional memory — what did the agent decide in this zone before?
+
+    Queries the ``agent_decisions`` Elasticsearch index for the most recent
+    PlanningAgent decisions mentioning this zone. Returns a formatted block for
+    prompt injection, or "" when ES is down / nothing recorded yet.
+    """
+    try:
+        from ..elastic.client import es_client
+
+        res = await es_client.search(index="agent_decisions", body={
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"agent_name": "PlanningAgent"}},
+                        {"match": {"action": zone}},
+                    ]
+                }
+            },
+            "sort": [{"timestamp": {"order": "desc"}}],
+            "size": limit,
+            "_source": ["action", "reasoning", "timestamp"],
+        })
+        hits = res.get("hits", {}).get("hits", [])
+        if not hits:
+            return ""
+        lines = []
+        for hit in hits:
+            src = hit["_source"]
+            lines.append(f"- [{src.get('timestamp', '')[:19]}] {src.get('action', '')}: {src.get('reasoning', '')[:160]}")
+        logger.info(f"Decision memory: recalled {len(lines)} past decision(s) for {zone}")
+        return "Past agent decisions in this zone (institutional memory):\n" + "\n".join(lines)
+    except Exception as e:
+        logger.debug(f"Decision memory unavailable: {e}")
+        return ""
+
+
 class PlanningAgent:
     """
     Planning Agent
@@ -62,6 +99,14 @@ class PlanningAgent:
 
     async def plan(self, event_data: dict, risk_assessment: dict) -> dict:
         logger.info("PlanningAgent formulating plan")
+
+        # Institutional memory — recall recent decisions in this zone so the
+        # LLM paths reason with experience. Injected via the event context so
+        # both the ADK prompt and the direct Gemini prompt pick it up.
+        if "_past_decisions" not in event_data:
+            memory = await recall_past_decisions(event_data.get("location", ""))
+            if memory:
+                event_data = dict(event_data, _past_decisions=memory)
 
         # 1. Preferred path: the ADK agent (Gemini 3 + Elastic vendor tool).
         adk_plan = await adk_agent.plan_via_adk(event_data, risk_assessment)
@@ -100,6 +145,13 @@ class PlanningAgent:
             "Return action, priority (P0 highest), resources_required.water, "
             "resources_required.food, and a concise operational reasoning."
         )
+        if event_data.get("_past_decisions"):
+            prompt += f"\n\n{event_data['_past_decisions']}"
+        if event_data.get("_constraint_correction"):
+            prompt += (
+                "\n\nIMPORTANT — your previous plan was infeasible. Apply this "
+                f"correction when re-planning: {event_data['_constraint_correction']}"
+            )
 
         result = await gemini.generate_json(
             prompt, schema=_PLAN_SCHEMA, system_instruction=_SYSTEM_INSTRUCTION

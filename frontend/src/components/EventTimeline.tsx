@@ -57,7 +57,7 @@ interface EventGroup {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function EventTimeline() {
-  const { agentActions, verifications } = useStore();
+  const { agentActions, verifications, planEvals } = useStore();
 
   const groups = useMemo<EventGroup[]>(() => {
     const map = new Map<string, AgentAction[]>();
@@ -126,11 +126,19 @@ export function EventTimeline() {
                 </span>
               </div>
 
-              {/* Timestamp + verification badge */}
+              {/* Timestamp + judge + verification badges */}
               <div className="px-3 pt-1.5 flex items-center justify-between gap-1">
                 <span className="text-[10px] text-slate-500">
                   {g.firstTs ? new Date(g.firstTs).toLocaleTimeString() : '—'}
                 </span>
+                {planEvals[g.eventId] && (
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200 shrink-0"
+                    title={`LLM judge: ${planEvals[g.eventId].score}/10 — ${planEvals[g.eventId].rationale}`}
+                  >
+                    ⚖ {planEvals[g.eventId].score}/10
+                  </span>
+                )}
                 {g.verification && (
                   <span
                     className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${

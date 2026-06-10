@@ -74,6 +74,38 @@ export interface VerificationInfo {
   timestamp: string;
 }
 
+export interface PlanSnapshot {
+  action: string;
+  priority: string;
+  resources_required?: { water: number; food: number };
+  reasoning: string;
+}
+
+export interface Counterfactual {
+  event_id: string;
+  rejected: PlanSnapshot;
+  corrected: PlanSnapshot;
+  correction: string;
+  blocking: string[];
+  timestamp: string;
+}
+
+export interface ImpactStat {
+  event_id: string;
+  response_time_saved_min: number;
+  units_dispatched: number;
+  revenue_protected_usd: number;
+  vendors_engaged: number;
+  timestamp: string;
+}
+
+export interface PlanEval {
+  event_id: string;
+  score: number;
+  rationale: string;
+  timestamp: string;
+}
+
 interface AppState {
   liveEvents: TelemetryEvent[];
   agentActions: AgentAction[];
@@ -81,6 +113,9 @@ interface AppState {
   restockBatches: RestockBatch[];
   pendingApprovals: PendingApproval[];
   verifications: Record<string, VerificationInfo>;
+  counterfactuals: Counterfactual[];
+  impacts: ImpactStat[];
+  planEvals: Record<string, PlanEval>;
   isDemoMode: boolean;
 
   addEvent: (event: TelemetryEvent) => void;
@@ -91,6 +126,9 @@ interface AppState {
   resolveApproval: (event_id: string) => void;
   acknowledgeRestockOrders: (event_id: string, acks: RestockAck[]) => void;
   addVerification: (v: VerificationInfo) => void;
+  addCounterfactual: (c: Counterfactual) => void;
+  addImpact: (i: ImpactStat) => void;
+  addPlanEval: (e: PlanEval) => void;
   setDemoMode: (val: boolean) => void;
 }
 
@@ -101,6 +139,9 @@ export const useStore = create<AppState>((set) => ({
   restockBatches: [],
   pendingApprovals: [],
   verifications: {},
+  counterfactuals: [],
+  impacts: [],
+  planEvals: {},
   isDemoMode: false,
 
   addEvent: (event) => set((state) => {
@@ -153,5 +194,18 @@ export const useStore = create<AppState>((set) => ({
     if (prev && prev.replan_count > v.replan_count) return state;
     return { verifications: { ...state.verifications, [v.event_id]: v } };
   }),
+  addCounterfactual: (c) => set((state) => {
+    // One per event_id+timestamp — replans of the same event may add another
+    const key = `${c.event_id}\x00${c.timestamp}`;
+    if (state.counterfactuals.some((x) => `${x.event_id}\x00${x.timestamp}` === key)) return state;
+    return { counterfactuals: [c, ...state.counterfactuals].slice(0, 10) };
+  }),
+  addImpact: (i) => set((state) => {
+    if (state.impacts.some((x) => x.event_id === i.event_id)) return state;
+    return { impacts: [i, ...state.impacts].slice(0, 50) };
+  }),
+  addPlanEval: (e) => set((state) => ({
+    planEvals: { ...state.planEvals, [e.event_id]: e },
+  })),
   setDemoMode: (val) => set({ isDemoMode: val }),
 }));

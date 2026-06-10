@@ -8,6 +8,8 @@ import { CampaignsPanel } from '../components/CampaignsPanel';
 import { RestockPanel } from '../components/RestockPanel';
 import { ApprovalQueue } from '../components/ApprovalQueue';
 import { EventTimeline } from '../components/EventTimeline';
+import { ImpactStrip } from '../components/ImpactStrip';
+import { CounterfactualPanel } from '../components/CounterfactualPanel';
 import { useStore } from '../store/useStore';
 
 // Leaflet + react-leaflet are heavy — split into their own chunk and load lazily.
@@ -60,6 +62,9 @@ export default function Dashboard() {
             case 'approval_resolved': s.resolveApproval(d.event_id as string); break;
             case 'restock_ack':       s.acknowledgeRestockOrders(d.event_id as string, d.acks); break;
             case 'verification':      s.addVerification(d); break;
+            case 'counterfactual':    s.addCounterfactual(d); break;
+            case 'impact':            s.addImpact(d); break;
+            case 'plan_eval':         s.addPlanEval(d); break;
           }
         } catch (e) {
           console.error('Failed to parse WS message', e);
@@ -190,7 +195,12 @@ export default function Dashboard() {
           <span className="w-3 h-3 rounded-full bg-orange-500 animate-ping"></span>
           System Operations
         </h2>
-        
+
+        {/* Impact strip — cumulative estimated impact of autonomous dispatches */}
+        <div className="mb-8">
+          <ImpactStrip />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 bg-white border border-slate-200/80 p-6 flex flex-col h-[500px] lg:h-[650px] rounded-xl shadow-md">
             <div className="flex-1 min-h-0">
@@ -218,6 +228,9 @@ export default function Dashboard() {
             <EventTimeline />
           </div>
         </div>
+
+        {/* Counterfactual — only renders when a self-correction has happened */}
+        <CounterfactualPanel />
 
         {/* Third row — Approval Queue + Campaigns + Restock */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-8">

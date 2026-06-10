@@ -24,6 +24,29 @@ _SUPPLIER_BY_ITEM = {
     "food": "StadiumEats Logistics",
 }
 
+# Impact-estimate baselines (honest heuristics, labelled "estimated" in the UI).
+_MANUAL_RESPONSE_MIN = 18.0   # typical human dispatch cycle: detect → call → approve → roll
+_AGENT_RESPONSE_MIN = 0.5     # the pipeline reacts in seconds
+_UNIT_PRICE = {"water": 4.0, "food": 9.0}  # stadium retail $/unit
+
+
+def _estimate_impact(allocations: list) -> dict:
+    """Estimated operational impact of a dispatch (for the dashboard stat strip).
+
+    Heuristic but defensible: response-time delta vs a manual ops cycle, and
+    revenue protected = units dispatched that would otherwise stock out at
+    stadium retail prices.
+    """
+    water = sum(a.get("take_water", 0) for a in allocations)
+    food = sum(a.get("take_food", 0) for a in allocations)
+    return {
+        "response_time_saved_min": round(_MANUAL_RESPONSE_MIN - _AGENT_RESPONSE_MIN, 1),
+        "units_dispatched": water + food,
+        "revenue_protected_usd": round(water * _UNIT_PRICE["water"] + food * _UNIT_PRICE["food"], 2),
+        "vendors_engaged": len(allocations),
+        "estimated": True,
+    }
+
 
 def _build_restock_orders(allocations: list) -> list:
     """Turn dispatched allocations into structured B2B restock orders.
@@ -131,6 +154,7 @@ class ExecutionAgent:
             "status": "DRY_RUN",
             "planned_allocations": dry_results,
             "restock_orders": restock_orders,
+            "impact": _estimate_impact(validation["approved_allocations"]),
         }
 
     async def _live_execute(self, validation: dict) -> dict:
@@ -180,6 +204,7 @@ class ExecutionAgent:
             "status": "EXECUTED",
             "executed_allocations": executed,
             "restock_orders": restock_orders,
+            "impact": _estimate_impact(executed),
         }
 
     async def _log_decision(self, action: str, detail: str):

@@ -55,7 +55,14 @@ INDEXES = {
                 "zone": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
                 "type": {"type": "keyword"},
                 "severity": {"type": "keyword"},
-                "description": {"type": "text"}
+                "description": {"type": "text"},
+                # Semantic retrieval — Gemini embedding of the description.
+                "embedding": {
+                    "type": "dense_vector",
+                    "dims": 768,
+                    "index": True,
+                    "similarity": "cosine"
+                }
             }
         }
     }
@@ -69,3 +76,13 @@ async def setup_indexes():
             logger.info(f"Created index: {index_name}")
         else:
             logger.info(f"Index {index_name} already exists")
+
+    # The supply_constraints index may pre-date the embedding field — adding a
+    # dense_vector to an existing mapping is additive and idempotent.
+    try:
+        await es_client.indices.put_mapping(
+            index="supply_constraints",
+            properties=INDEXES["supply_constraints"]["mappings"]["properties"],
+        )
+    except Exception as e:
+        logger.warning(f"Could not update supply_constraints mapping: {e}")

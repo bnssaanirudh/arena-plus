@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FastForward, Clapperboard } from 'lucide-react';
+import { FastForward, Clapperboard, Layers } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
@@ -22,6 +22,21 @@ export function DemoControls() {
             console.error('Failed to trigger surge', e);
         } finally {
             setTriggering(false);
+        }
+    }
+
+    const [multiRunning, setMultiRunning] = useState(false);
+
+    async function triggerMultiSurge() {
+        if (multiRunning) return;
+        setMultiRunning(true);
+        try {
+            await fetch(`${API_BASE}/api/v1/events/demo/multi`, { method: 'POST' });
+            // 3 staggered pipelines take ~30s to fully play out
+            setTimeout(() => setMultiRunning(false), 30000);
+        } catch (e) {
+            console.error('Failed to trigger multi-surge', e);
+            setMultiRunning(false);
         }
     }
 
@@ -95,6 +110,17 @@ export function DemoControls() {
             >
                 <FastForward size={14} />
                 {triggering ? 'Triggering…' : 'Trigger Surge'}
+            </button>
+
+            {/* 3 concurrent zone surges — inventory contention demo */}
+            <button
+                onClick={triggerMultiSurge}
+                disabled={multiRunning}
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-widest bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Fire 3 simultaneous zone surges — pipelines compete for the same vendor stock"
+            >
+                <Layers size={14} />
+                {multiRunning ? 'Surging ×3…' : 'Multi-Surge'}
             </button>
         </div>
     );

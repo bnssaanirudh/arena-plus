@@ -104,6 +104,19 @@ async def websocket_dashboard(websocket: WebSocket):
                 reasoning = plan.get("reasoning", "")
                 if data.get("correction_applied"):
                     reasoning = f"[Correction: {data['correction_applied']}] {reasoning}"
+                # Counterfactual: rejected plan vs corrected plan, side by side
+                if data.get("self_correction") and data.get("rejected_plan"):
+                    extra_payloads.append({
+                        "type": "counterfactual",
+                        "data": {
+                            "event_id": data.get("event_id"),
+                            "rejected": data["rejected_plan"],
+                            "corrected": plan,
+                            "correction": data.get("correction_applied", ""),
+                            "blocking": data.get("blocking_constraints", []),
+                            "timestamp": timestamp,
+                        }
+                    })
 
             elif channel == Channels.AGENT_INVENTORY:
                 alloc = data.get("allocation", {})
@@ -178,6 +191,16 @@ async def websocket_dashboard(websocket: WebSocket):
                                 "timestamp": timestamp,
                             }
                         })
+                    # Estimated operational impact for the dashboard stat strip
+                    if execution.get("impact"):
+                        extra_payloads.append({
+                            "type": "impact",
+                            "data": {
+                                "event_id": data.get("event_id"),
+                                **execution["impact"],
+                                "timestamp": timestamp,
+                            }
+                        })
                 reasoning = ""
 
             elif channel == Channels.AGENT_MARKETING:
@@ -208,6 +231,17 @@ async def websocket_dashboard(websocket: WebSocket):
 
             elif channel == Channels.AGENT_PIPELINE:
                 stage = data.get("stage", "")
+                # LLM-judge score — forward as a typed message only (no agent_action row)
+                if stage == "EVALUATED":
+                    await websocket.send_json({
+                        "type": "plan_eval",
+                        "data": {
+                            "event_id": data.get("event_id"),
+                            **data.get("eval", {}),
+                            "timestamp": timestamp,
+                        }
+                    })
+                    continue
                 action_text = f"Pipeline {stage}"
                 reasoning = f"Event ID: {data.get('event_id', '')}"
                 # Approval resolved — notify frontend to remove from queue

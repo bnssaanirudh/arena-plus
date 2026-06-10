@@ -139,6 +139,18 @@ The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remain
 - [x] 4.4 README: 8-stage ASCII pipeline diagram + hackathon-pillar table (Gemini/ADK/Elastic/Arize mapped to exact files)
 - [x] 4.5 `README.md` + `CLAUDE.md` updated to the Gemini-3 / ADK / Elastic-MCP architecture; stale docs (AUDIT/TASKS/context/leakage) removed
 
+### 4.6 First-place polish round (2026-06-10) — all built, tested live
+- [x] 4.6.1 **Live ES|QL analytics** — `GET /api/v1/analytics/summary` runs 3 real ES|QL queries (zone density, agent decisions, vendor stock); GlobalAnalytics page shows "Live ES|QL" badges with the verbatim query behind each chart. Verified 3/3 live against Elastic Cloud.
+- [x] 4.6.2 **Hybrid semantic RAG** — `supply_constraints` docs carry Gemini embeddings (`dense_vector` 768, cosine); `_retrieve_constraints` runs BM25 + kNN combined; BM25-only and in-memory fallbacks intact. Verified: "Retrieved 5 constraints (hybrid BM25+kNN)".
+- [x] 4.6.3 **Agent decision memory** — planning decisions recorded to `agent_decisions`; recalled by zone and injected into ADK/Gemini prompts. Verified: "recalled 3 past decision(s) for South Gate". Also fixed: `_constraint_correction` was injected by the manager but never reached either LLM prompt — self-correction now actually informs the re-plan.
+- [x] 4.6.4 **LLM-judge plan eval** — Gemini judge scores each executed plan 1-10 → OTel `plan_eval` span (Arize) + ⚖ badge on EventTimeline. Verified: 9/10 + 10/10 scores on concurrent pipelines.
+- [x] 4.6.5 **Counterfactual panel** — rejected vs corrected plan side-by-side with blocking constraint; renders only after a self-correction. Verified live.
+- [x] 4.6.6 **Multi-surge concurrency** — `POST /api/v1/events/demo/multi` + "Multi-Surge" button: 3 zones surge concurrently, pipelines compete for stock. Verified: 3 parallel pipelines, evals 2 s apart.
+- [x] 4.6.7 **Impact metrics strip** — per-dispatch estimate (response-time saved, units, revenue protected) → cumulative dashboard stat cards. Verified: 35 min / 1,260 units after demo cascade.
+- [x] 4.6.8 **Agent-thinking typewriter** — newest AgentPanel reasoning types out live.
+- [x] 4.6.9 **README hero** — `docs/dashboard-hero.png` + `docs/dashboard-operations.png` captured via `frontend/capture-hero.mjs`; embedded at top of README. (A short GIF for Devpost is still better — record during M12.)
+- [x] 4.6.10 **Test hardening** — `tests/conftest.py` forces the heuristic path (blank Gemini key, ADK + eval off): suite was silently quota-dependent (2 tests failed once a working key was present); now 57/57 in ~4 s offline.
+
 ---
 
 ## Critical path (suggested order)

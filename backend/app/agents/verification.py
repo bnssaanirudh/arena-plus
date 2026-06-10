@@ -116,11 +116,16 @@ _SYSTEM_INSTRUCTION = (
 
 
 async def _retrieve_constraints(zone: str, action: str) -> List[Dict[str, Any]]:
-    """Retrieve relevant constraints for a zone + action from Elasticsearch (BM25) with in-memory fallback."""
+    """Retrieve relevant constraints for a zone + action from Elasticsearch.
+
+    Hybrid retrieval: BM25 keyword match + kNN over Gemini embeddings when a
+    query vector is available; pure BM25 otherwise; in-memory keyword fallback
+    when ES is down. Hits never include the (large) embedding field.
+    """
     try:
         from ..elastic.client import es_client
-        # Query Elasticsearch if connection is active and index exists
-        query = {
+
+        body: Dict[str, Any] = {
             "query": {
                 "bool": {
                     "should": [
@@ -130,14 +135,27 @@ async def _retrieve_constraints(zone: str, action: str) -> List[Dict[str, Any]]:
                     ]
                 }
             },
-            "size": 5
+            "size": 5,
+            "_source": {"excludes": ["embedding"]},
         }
-        res = await es_client.search(index="supply_constraints", body=query)
+
+        # Semantic half of the hybrid query — skipped cleanly if embedding fails.
+        query_vector = await gemini.embed_text(f"{action} intervention at {zone}")
+        if query_vector:
+            body["knn"] = {
+                "field": "embedding",
+                "query_vector": query_vector,
+                "k": 5,
+                "num_candidates": 16,
+            }
+
+        res = await es_client.search(index="supply_constraints", body=body)
         hits = []
         for hit in res.get("hits", {}).get("hits", []):
             hits.append(hit["_source"])
         if hits:
-            logger.info(f"Retrieved {len(hits)} constraints from Elasticsearch BM25 query")
+            mode = "hybrid BM25+kNN" if query_vector else "BM25"
+            logger.info(f"Retrieved {len(hits)} constraints from Elasticsearch ({mode})")
             return hits
     except Exception as e:
         logger.warning(f"Failed to query supply_constraints in Elasticsearch: {e}. Falling back to in-memory constraints.")

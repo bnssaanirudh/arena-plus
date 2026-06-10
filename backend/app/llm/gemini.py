@@ -13,7 +13,7 @@ to their heuristic logic — preserving ArenaPulse's zero-external-deps property
 """
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
@@ -121,3 +121,36 @@ async def generate_json(
     except Exception as e:  # pragma: no cover - depends on external service
         logger.warning(f"Gemini generate_json failed: {e}")
         return None
+
+
+async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
+    """
+    Embed a batch of texts with the Gemini embedding model (one API call).
+
+    Returns a list of float vectors (length EMBED_DIMS each), or None on any
+    failure so callers fall back to keyword/BM25 retrieval.
+    """
+    client = _get_client()
+    if client is None or not texts:
+        return None
+    try:
+        from google.genai import types
+
+        response = await client.aio.models.embed_content(
+            model=settings.GEMINI_EMBED_MODEL,
+            contents=texts,
+            config=types.EmbedContentConfig(output_dimensionality=settings.EMBED_DIMS),
+        )
+        vectors = [list(e.values) for e in (response.embeddings or [])]
+        if len(vectors) != len(texts):
+            return None
+        return vectors
+    except Exception as e:  # pragma: no cover - depends on external service
+        logger.warning(f"Gemini embed_texts failed: {e}")
+        return None
+
+
+async def embed_text(text: str) -> Optional[List[float]]:
+    """Embed a single text. Returns the vector or None (caller falls back)."""
+    vectors = await embed_texts([text])
+    return vectors[0] if vectors else None

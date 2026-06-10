@@ -26,12 +26,27 @@ async def ingest_vendors():
 
 async def ingest_constraints():
     from ..agents.verification import _CONSTRAINTS
+    from ..llm import gemini
+
+    # Embed all descriptions in one batched call — enables kNN retrieval.
+    # On failure (Gemini unconfigured / quota), ingest without vectors; BM25 still works.
+    vectors = await gemini.embed_texts(
+        [f"{c['zone']} {c['type']}: {c['description']}" for c in _CONSTRAINTS]
+    )
+    if vectors:
+        logger.info(f"Embedded {len(vectors)} supply constraints for semantic (kNN) retrieval")
+    else:
+        logger.info("Constraint embeddings unavailable — BM25-only retrieval")
+
     operations = []
-    for constraint in _CONSTRAINTS:
+    for i, constraint in enumerate(_CONSTRAINTS):
         operations.append({
             "index": {"_index": "supply_constraints", "_id": constraint["id"]}
         })
-        operations.append(constraint.copy())
+        doc = constraint.copy()
+        if vectors:
+            doc["embedding"] = vectors[i]
+        operations.append(doc)
         
     try:
         if operations:

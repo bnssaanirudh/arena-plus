@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # CORS — wildcard + credentials is rejected by browsers; list explicit origins
     CORS_ORIGINS: List[str] = [
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:4173",
         "http://localhost:3000",
     ]
@@ -31,6 +32,10 @@ class Settings(BaseSettings):
     GOOGLE_CLOUD_LOCATION: str = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
     # Set to the exact Gemini 3 model id available in your project (verify in Vertex AI / AI Studio).
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3-pro-preview")
+    # Embedding model for semantic (kNN) retrieval — generous free-tier quota.
+    GEMINI_EMBED_MODEL: str = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+    # Truncated embedding dimensionality (matches the dense_vector mapping in ES).
+    EMBED_DIMS: int = int(os.getenv("EMBED_DIMS", "768"))
 
     # Google Cloud Agent Builder / ADK. When True (and google-adk is installed and
     # Gemini is configured), the planning brain runs as an ADK LlmAgent that can
@@ -46,6 +51,10 @@ class Settings(BaseSettings):
     
     # Strict RAG compliance. When True, constraints verification can trigger replanning.
     STRICT_RAG: bool = os.getenv("STRICT_RAG", "true").lower() == "true"
+
+    # LLM-judge evaluation of each executed plan (1 extra Gemini call per pipeline).
+    # Scores land as OTel span attributes → visible in Arize Phoenix traces.
+    PLAN_EVAL_ENABLED: bool = os.getenv("PLAN_EVAL_ENABLED", "true").lower() == "true"
 
     # ML Model
     ML_MODEL_PATH: str = os.path.join(

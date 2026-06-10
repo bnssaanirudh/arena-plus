@@ -154,7 +154,7 @@ def _extract_json(text: str) -> Optional[Dict[str, Any]]:
 
 
 def _build_prompt(event_data: dict, risk_assessment: dict) -> str:
-    return (
+    prompt = (
         "Decide the intervention plan for this situation.\n\n"
         f"Risk level: {risk_assessment.get('risk_level', 'LOW')}\n"
         f"Surge probability: {risk_assessment.get('probability', 0):.1%}\n"
@@ -166,6 +166,14 @@ def _build_prompt(event_data: dict, risk_assessment: dict) -> str:
         f"Density score (0-10): {event_data.get('density_score', 'n/a')}\n"
         f"Predicted people in zone: {event_data.get('predicted_people', 'n/a')}\n"
     )
+    if event_data.get("_past_decisions"):
+        prompt += f"\n{event_data['_past_decisions']}\n"
+    if event_data.get("_constraint_correction"):
+        prompt += (
+            "\nIMPORTANT — your previous plan was infeasible. Apply this "
+            f"correction when re-planning: {event_data['_constraint_correction']}\n"
+        )
+    return prompt
 
 
 async def plan_via_adk(event_data: dict, risk_assessment: dict) -> Optional[Dict[str, Any]]:

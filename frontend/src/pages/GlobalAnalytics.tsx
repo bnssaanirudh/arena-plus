@@ -1,58 +1,95 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Nav } from '../components/Nav';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
-import { BarChart3, TrendingUp, PieChart as PieIcon, RefreshCw, ChevronDown } from 'lucide-react';
+import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import { BarChart3, TrendingUp, PieChart as PieIcon, RefreshCw, ChevronDown, Database } from 'lucide-react';
 
-interface ZoneData {
-  time: string;
-  "Zone 1": number;
-  "Zone 2": number;
-  "Zone 3": number;
-  "Zone 4": number;
-  "Zone 5": number;
-  "Zone 6": number;
-  "Zone 7": number;
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
+
+interface Dataset<T> {
+  source: 'esql' | 'mock';
+  query: string;
+  rows: T[];
+}
+
+interface ZoneRow { location: string; avg_density: number; events: number; peak_people: number }
+interface OpsRow { agent_name: string; decisions: number }
+interface StockRow { vendor_name: string; inventory_water: number; inventory_food: number; inventory_merchandise: number }
+
+interface Summary {
+  zone_density: Dataset<ZoneRow>;
+  agent_ops: Dataset<OpsRow>;
+  vendor_stock: Dataset<StockRow>;
+  meta: { live_datasets: number; total_datasets: number };
+}
+
+const OPS_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+/** "LIVE ES|QL" / "MOCK" badge + collapsible query text — judges see what ran. */
+function SourceBadge({ ds }: { ds: Dataset<unknown> }) {
+  const live = ds.source === 'esql';
+  return (
+    <details className="ml-auto text-right">
+      <summary
+        className={`list-none cursor-pointer inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${
+          live
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-slate-100 text-slate-500 border-slate-200'
+        }`}
+        title="Click to see the ES|QL query behind this chart"
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${live ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+        {live ? 'Live ES|QL' : 'Mock data'}
+      </summary>
+      <code className="block mt-2 max-w-[420px] text-left whitespace-pre-wrap break-words text-[10px] leading-relaxed bg-slate-900 text-emerald-300 rounded-lg p-3 font-mono">
+        {ds.query}
+      </code>
+    </details>
+  );
 }
 
 export default function GlobalAnalytics() {
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [selectedZone, setSelectedZone] = useState<string>('All');
-  const [selectedPhase, setSelectedPhase] = useState<string>('Halftime');
   const [loading, setLoading] = useState(false);
 
-  // Simulated time series density data by zone
-  const densityData: ZoneData[] = [
-    { time: '18:00', "Zone 1": 450, "Zone 2": 250, "Zone 3": 120, "Zone 4": 650, "Zone 5": 300, "Zone 6": 180, "Zone 7": 90 },
-    { time: '18:30', "Zone 1": 780, "Zone 2": 480, "Zone 3": 340, "Zone 4": 820, "Zone 5": 540, "Zone 6": 390, "Zone 7": 150 },
-    { time: '19:00', "Zone 1": 1200, "Zone 2": 950, "Zone 3": 850, "Zone 4": 1400, "Zone 5": 920, "Zone 6": 780, "Zone 7": 410 },
-    { time: '19:30', "Zone 1": 890, "Zone 2": 620, "Zone 3": 550, "Zone 4": 980, "Zone 5": 710, "Zone 6": 600, "Zone 7": 320 },
-    { time: '20:00', "Zone 1": 1480, "Zone 2": 1390, "Zone 3": 1100, "Zone 4": 1850, "Zone 5": 1290, "Zone 6": 1150, "Zone 7": 680 }, // Halftime peak
-    { time: '20:30', "Zone 1": 950, "Zone 2": 710, "Zone 3": 620, "Zone 4": 1120, "Zone 5": 840, "Zone 6": 700, "Zone 7": 410 },
-    { time: '21:00', "Zone 1": 520, "Zone 2": 380, "Zone 3": 290, "Zone 4": 610, "Zone 5": 440, "Zone 6": 350, "Zone 7": 210 }
-  ];
-
-  // Simulated vendor stock level data
-  const stockData = [
-    { name: 'Gate A Snacks', food: 88, water: 95, merch: 40 },
-    { name: 'North Stand Concessions', food: 35, water: 42, merch: 78 },
-    { name: 'South Concourse E', food: 92, water: 80, merch: 65 },
-    { name: 'Zone 4 Beer & Soda', food: 15, water: 22, merch: 12 }, // Low stock hotspot
-    { name: 'VIP Lounge Dining', food: 70, water: 85, merch: 90 },
-    { name: 'East Plaza Kiosk', food: 50, water: 65, merch: 30 }
-  ];
-
-  // Agent action frequency metrics
-  const agentActionData = [
-    { name: 'B2B Restock Dispatch', value: 42, color: '#10b981' },
-    { name: 'Autonomous Campaign / Discount', value: 28, color: '#3b82f6' },
-    { name: 'Crowd Bottleneck Warning', value: 18, color: '#f59e0b' },
-    { name: 'Security Relocation Alert', value: 12, color: '#ef4444' }
-  ];
-
-  const handleRefresh = () => {
+  const fetchSummary = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => setLoading(false), 800);
-  };
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/analytics/summary`);
+      if (res.ok) setSummary(await res.json());
+    } catch (e) {
+      console.error('Failed to fetch analytics summary', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSummary(); }, [fetchSummary]);
+
+  const zones = useMemo(
+    () => ['All', ...(summary?.zone_density.rows.map((r) => r.location) ?? [])],
+    [summary],
+  );
+
+  const zoneRows = useMemo(() => {
+    const rows = summary?.zone_density.rows ?? [];
+    const filtered = selectedZone === 'All' ? rows : rows.filter((r) => r.location === selectedZone);
+    return filtered.map((r) => ({
+      ...r,
+      avg_density: Math.round((r.avg_density ?? 0) * 10) / 10,
+    }));
+  }, [summary, selectedZone]);
+
+  const opsRows = useMemo(
+    () => (summary?.agent_ops.rows ?? []).map((r, i) => ({ ...r, color: OPS_COLORS[i % OPS_COLORS.length] })),
+    [summary],
+  );
+
+  const opsTotal = useMemo(() => opsRows.reduce((s, r) => s + r.decisions, 0), [opsRows]);
+
+  const stockRows = summary?.vendor_stock.rows ?? [];
+  const liveCount = summary?.meta.live_datasets ?? 0;
 
   return (
     <div className="w-full min-h-screen flex flex-col bg-white text-black selection:bg-orange-500 selection:text-white">
@@ -66,9 +103,15 @@ export default function GlobalAnalytics() {
             <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight text-black leading-none">
               Global Analytics
             </h1>
+            <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+              <Database className="w-4 h-4 text-emerald-600" />
+              {summary
+                ? `${liveCount}/${summary.meta.total_datasets} charts fed by live Elasticsearch ES|QL queries`
+                : 'Connecting to Elasticsearch…'}
+            </p>
           </div>
-          <button 
-            onClick={handleRefresh} 
+          <button
+            onClick={fetchSummary}
             disabled={loading}
             className="flex items-center gap-2 bg-black hover:bg-orange-600 text-white font-bold uppercase text-xs tracking-widest px-6 py-3.5 transition-colors"
           >
@@ -78,41 +121,19 @@ export default function GlobalAnalytics() {
         </div>
       </section>
 
-      {/* Control Filters */}
+      {/* Zone filter */}
       <section className="max-w-7xl mx-auto w-full px-6 md:px-12 pt-10 flex flex-wrap gap-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Filter Zone:</span>
           <div className="relative inline-block">
-            <select 
-              value={selectedZone} 
+            <select
+              value={selectedZone}
               onChange={(e) => setSelectedZone(e.target.value)}
               className="appearance-none bg-slate-50 border border-slate-200 text-black px-4 py-2 pr-8 font-bold text-xs uppercase tracking-wider rounded-lg focus:outline-none focus:border-orange-500 cursor-pointer"
             >
-              <option value="All">All Stadium Zones</option>
-              <option value="Zone 1">Zone 1 (Main Entrance)</option>
-              <option value="Zone 2">Zone 2 (North Concourse)</option>
-              <option value="Zone 3">Zone 3 (Pedestrian Bridge)</option>
-              <option value="Zone 4">Zone 4 (East Concourse)</option>
-              <option value="Zone 5">Zone 5 (West Concourse)</option>
-              <option value="Zone 6">Zone 6 (Premium Club)</option>
-              <option value="Zone 7">Zone 7 (B2B Supply Hub)</option>
-            </select>
-            <ChevronDown className="absolute right-2.5 top-3 w-3 h-3 text-slate-500 pointer-events-none" />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Match Phase:</span>
-          <div className="relative inline-block">
-            <select 
-              value={selectedPhase} 
-              onChange={(e) => setSelectedPhase(e.target.value)}
-              className="appearance-none bg-slate-50 border border-slate-200 text-black px-4 py-2 pr-8 font-bold text-xs uppercase tracking-wider rounded-lg focus:outline-none focus:border-orange-500 cursor-pointer"
-            >
-              <option value="Pre-match">Pre-match Gate Surge</option>
-              <option value="In-progress">Match In Progress</option>
-              <option value="Halftime">Halftime intermission</option>
-              <option value="Post-match">Egress Discharge</option>
+              {zones.map((z) => (
+                <option key={z} value={z}>{z === 'All' ? 'All Stadium Zones' : z}</option>
+              ))}
             </select>
             <ChevronDown className="absolute right-2.5 top-3 w-3 h-3 text-slate-500 pointer-events-none" />
           </div>
@@ -121,60 +142,62 @@ export default function GlobalAnalytics() {
 
       {/* Charts Panels */}
       <main className="max-w-7xl mx-auto w-full px-6 md:px-12 py-10 flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Crowd Flow Area Chart */}
+
+        {/* Zone density (live ES|QL aggregation) */}
         <div className="lg:col-span-8 border border-slate-200/80 bg-white p-6 rounded-2xl shadow-sm flex flex-col h-[450px]">
-          <h3 className="text-lg font-bold uppercase tracking-wide mb-6 text-black flex items-center gap-2 shrink-0">
-            <TrendingUp className="w-5 h-5 text-orange-600" />
-            Crowd Density Mapping Over Time
-          </h3>
+          <div className="flex items-start gap-2 mb-6 shrink-0">
+            <h3 className="text-lg font-bold uppercase tracking-wide text-black flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-orange-600" />
+              Crowd Density by Zone
+            </h3>
+            {summary && <SourceBadge ds={summary.zone_density} />}
+          </div>
           <div className="flex-1 min-h-0 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={densityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorZone" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ea580c" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#ea580c" stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
-                <YAxis stroke="#94a3b8" fontSize={11} />
-                <Tooltip />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                {selectedZone === 'All' ? (
-                  <>
-                    <Area type="monotone" dataKey="Zone 4" stroke="#ea580c" fillOpacity={1} fill="url(#colorZone)" />
-                    <Area type="monotone" dataKey="Zone 1" stroke="#4f46e5" fill="none" strokeDasharray="5 5" />
-                    <Area type="monotone" dataKey="Zone 2" stroke="#16a34a" fill="none" />
-                  </>
-                ) : (
-                  <Area type="monotone" dataKey={selectedZone as any} stroke="#ea580c" fillOpacity={1} fill="url(#colorZone)" />
-                )}
-              </AreaChart>
-            </ResponsiveContainer>
+            {zoneRows.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-400 text-sm italic">
+                No crowd events indexed yet — trigger a surge from the dashboard.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={zoneRows} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                  <XAxis dataKey="location" stroke="#94a3b8" fontSize={11} />
+                  {/* density is 0-10, event counts are unbounded — separate axes */}
+                  <YAxis yAxisId="density" stroke="#ea580c" fontSize={11} domain={[0, 10]} />
+                  <YAxis yAxisId="events" orientation="right" stroke="#4f46e5" fontSize={11} />
+                  <Tooltip />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                  <Bar yAxisId="density" dataKey="avg_density" name="Avg density (0-10)" fill="#ea580c" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="events" dataKey="events" name="Events" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* Agent Decisions Pie Chart */}
+        {/* Agent decisions pie (live ES|QL aggregation) */}
         <div className="lg:col-span-4 border border-slate-200/80 bg-white p-6 rounded-2xl shadow-sm flex flex-col h-[450px]">
-          <h3 className="text-lg font-bold uppercase tracking-wide mb-6 text-black flex items-center gap-2 shrink-0">
-            <PieIcon className="w-5 h-5 text-indigo-600" />
-            Agent Operations Shares
-          </h3>
+          <div className="flex items-start gap-2 mb-6 shrink-0">
+            <h3 className="text-lg font-bold uppercase tracking-wide text-black flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-indigo-600" />
+              Agent Decisions
+            </h3>
+            {summary && <SourceBadge ds={summary.agent_ops} />}
+          </div>
           <div className="flex-grow min-h-0 flex items-center justify-center">
             <ResponsiveContainer width="100%" height="80%">
               <PieChart>
                 <Pie
-                  data={agentActionData}
+                  data={opsRows}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
                   outerRadius={85}
                   paddingAngle={4}
-                  dataKey="value"
+                  dataKey="decisions"
+                  nameKey="agent_name"
                 >
-                  {agentActionData.map((entry, index) => (
+                  {opsRows.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -183,35 +206,40 @@ export default function GlobalAnalytics() {
             </ResponsiveContainer>
           </div>
           <div className="shrink-0 flex flex-col gap-2 mt-4 text-xs">
-            {agentActionData.map((item, idx) => (
-              <div key={idx} className="flex justify-between items-center text-slate-600">
+            {opsRows.map((item) => (
+              <div key={item.agent_name} className="flex justify-between items-center text-slate-600">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span>{item.name}</span>
+                  <span>{item.agent_name}</span>
                 </div>
-                <span className="font-bold text-black">{item.value}%</span>
+                <span className="font-bold text-black">
+                  {opsTotal > 0 ? Math.round((item.decisions / opsTotal) * 100) : 0}%
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Vendor Stock Distribution */}
+        {/* Vendor stock (live ES|QL over the vendors index) */}
         <div className="lg:col-span-12 border border-slate-200/80 bg-white p-6 rounded-2xl shadow-sm h-[400px] flex flex-col">
-          <h3 className="text-lg font-bold uppercase tracking-wide mb-6 text-black flex items-center gap-2 shrink-0">
-            <BarChart3 className="w-5 h-5 text-emerald-600" />
-            Concession Vendor In-Stock Percentages
-          </h3>
+          <div className="flex items-start gap-2 mb-6 shrink-0">
+            <h3 className="text-lg font-bold uppercase tracking-wide text-black flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-emerald-600" />
+              Vendor Inventory Levels
+            </h3>
+            {summary && <SourceBadge ds={summary.vendor_stock} />}
+          </div>
           <div className="flex-grow min-h-0 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stockData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+              <BarChart data={stockRows} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-                <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} />
-                <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 100]} />
+                <XAxis dataKey="vendor_name" stroke="#94a3b8" fontSize={10} />
+                <YAxis stroke="#94a3b8" fontSize={11} />
                 <Tooltip />
                 <Legend iconType="rect" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="water" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="food" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="merch" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="inventory_water" name="Water" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="inventory_food" name="Food" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="inventory_merchandise" name="Merch" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

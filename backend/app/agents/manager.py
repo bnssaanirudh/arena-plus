@@ -60,6 +60,19 @@ class AgentManager:
         res = plan.get("resources_required", {}) or {}
         return (res.get("water", 0) + res.get("food", 0)) >= settings.APPROVAL_RESOURCE_THRESHOLD
 
+    @staticmethod
+    def _record_planning_decision(event_data: dict, plan: dict) -> None:
+        """Write the decision to the agent_decisions ES index (institutional
+        memory the PlanningAgent recalls on future events in the same zone).
+        Fire-and-forget — memory is a bonus, never a blocker."""
+        from ..mcp.tools import MCPTools
+        zone = event_data.get("location", "unknown")
+        asyncio.create_task(MCPTools.record_agent_action(
+            agent_name="PlanningAgent",
+            action=f"{plan.get('action', 'UNKNOWN')} at {zone} [{plan.get('priority', '')}]",
+            reasoning=plan.get("reasoning", ""),
+        ))
+
     async def process_event(self, event_data: dict) -> dict:
         """
         Pipeline:
@@ -107,6 +120,7 @@ class AgentManager:
             "event_id": event_id,
             "plan": plan,
         }, source="PlanningAgent")
+        self._record_planning_decision(event_data, plan)
 
         if plan["action"] == "MONITOR":
             logger.info("--- Agent Workflow Ended (MONITOR ONLY) ---")
@@ -225,6 +239,7 @@ class AgentManager:
 
             # Inject the correction into the event context for re-planning
             corrected_event = dict(event_data, _constraint_correction=correction)
+            rejected_plan = plan  # keep for the counterfactual display
             plan = await self.planning.plan(corrected_event, risk_assessment)
             plan["replan_count"] = replans
             previous_correction = correction
@@ -234,7 +249,10 @@ class AgentManager:
                 "plan": plan,
                 "self_correction": True,
                 "correction_applied": correction,
+                "rejected_plan": rejected_plan,
+                "blocking_constraints": verification.get("blocking", []),
             }, source="PlanningAgent")
+            self._record_planning_decision(event_data, plan)
 
             if plan["action"] == "MONITOR":
                 # After re-plan, if the agent backs off to MONITOR, stop early
@@ -285,6 +303,11 @@ class AgentManager:
             "stage": "COMPLETED",
             "result": execution_result.get("status", "UNKNOWN"),
         }, source="AgentManager")
+
+        # LLM-judge scores the executed plan (fire-and-forget, config-gated).
+        if settings.PLAN_EVAL_ENABLED:
+            from ..observability.evaluator import evaluate_plan
+            asyncio.create_task(evaluate_plan(event_id, event_data, plan))
 
         return {"execution": execution_result, "deal": deal}
 
