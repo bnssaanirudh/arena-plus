@@ -21,11 +21,12 @@ google-genai>=1.0.0
 google-adk>=2.0.0
 
 # Observability (Arize partner integration)
-# arize-phoenix full server has OTel deps incompatible with google-adk 2.x.
-# Use arize-phoenix-otel (lightweight OTLP instrumentation) instead.
+# DO NOT install arize-phoenix (full server) — its deps break on Python 3.13 / google-adk 2.x.
+# arize-phoenix-otel is the lightweight OTLP-only package; it is the correct one.
 # Connect to Arize AX cloud or a local Phoenix server via PHOENIX_COLLECTOR_ENDPOINT.
 arize-phoenix-otel>=0.6.0
 openinference-instrumentation>=0.1.0
+openinference-instrumentation-google-genai>=1.0.0
 opentelemetry-api>=1.36.0,<1.42.0
 opentelemetry-sdk>=1.36.0,<1.42.0
 opentelemetry-exporter-otlp>=1.36.0,<1.42.0

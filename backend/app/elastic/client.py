@@ -11,7 +11,7 @@ ELASTIC_API_KEY = os.getenv("ELASTIC_API_KEY")
 es_client = AsyncElasticsearch(
     ELASTICSEARCH_URL,
     api_key=ELASTIC_API_KEY,
-    verify_certs=False,
+    verify_certs=True,
     request_timeout=30.0
 )
 

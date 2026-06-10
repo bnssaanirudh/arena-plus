@@ -37,7 +37,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`) — **done: `gemini-3-flash-preview` (AI Studio); full pipeline smoke-tested (M8)**
 - [x] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
 - [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
-- [x] M6. (Secondary) Create a free **Arize AX** account → share **Space ID** + **API key**
+- [x] M6. (Secondary) Create a free **Arize AX** account → creds in `.env`; `arize-phoenix-otel` + `openinference-instrumentation-google-genai` installed; tracer boots authenticated=True + Gemini instrumented. **Blocked:** `PHOENIX_COLLECTOR_ENDPOINT` must be set to the OTLP ingest URL from Arize AX Settings (not the web UI URL — see Known issues).
 
 **After Phase 1–4 build (once agent + MCP + actions work locally):**
 - [ ] M7. Authenticate `gcloud` locally (`gcloud auth application-default login`) so Vertex calls work
@@ -125,8 +125,8 @@ The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remain
 
 ## 3. ⭐ Arize secondary integration (judging bonus)
 
-- [x] 3.1 Replaced broken `arize-phoenix` full server dep with `arize-phoenix-otel` (lightweight OTLP); `tracer.py` now no-ops cleanly with an INFO log when `PHOENIX_COLLECTOR_ENDPOINT` is not set — no startup warnings
-- [x] 3.2 Instrument ADK + Gemini + MCP tool calls so every multi-step decision is traced — set `PHOENIX_COLLECTOR_ENDPOINT` (local Phoenix server or Arize AX cloud, M6)
+- [x] 3.1 `arize-phoenix-otel` (lightweight OTLP) installed; `arize-phoenix` full server removed (breaks Python 3.13 import chain); `openinference-instrumentation-google-genai` added — Gemini calls now auto-instrumented. `tracer.py` no-ops cleanly when `PHOENIX_COLLECTOR_ENDPOINT` unset.
+- [~] 3.2 Tracer boots successfully (authenticated=True, Gemini instrumented). **Blocked:** 404 on export — `PHOENIX_COLLECTOR_ENDPOINT` set to web-UI URL, not OTLP ingest URL. Fix: go to Arize AX → Settings → API Keys → copy the OTLP collector endpoint (format: `https://otlp.arize.com/v1` or similar) → update `.env`.
 - [ ] 3.3 Capture a screenshot/segment of the Arize trace for the demo video (shows reasoning + error-correction)
 
 ---

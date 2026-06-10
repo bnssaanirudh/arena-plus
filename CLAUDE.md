@@ -90,7 +90,7 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 - `mcp` — current home-grown tools (nearest vendor, overloaded zones, inventory) over ES with in-memory haversine fallback. **Being migrated to the official Elastic MCP server** as the agent's tool layer (HACKATHON_PLAN 1.4).
 
 ### Observability
-`observability/tracer.py` `setup_phoenix()` — uses `arize-phoenix-otel` (lightweight OTLP, no OTel version conflict with google-adk). No-ops cleanly (INFO log only) when `PHOENIX_COLLECTOR_ENDPOINT` is not set. Set it to `http://localhost:6006/v1/traces` (local Phoenix server) or Arize AX cloud endpoint (M6) to enable tracing. `opentelemetry-sdk` is pinned `<1.42` to stay compatible with `google-adk 2.x`.
+`observability/tracer.py` `setup_phoenix()` — uses `arize-phoenix-otel` (lightweight OTLP, no OTel version conflict with google-adk). No-ops cleanly (INFO log only) when `PHOENIX_COLLECTOR_ENDPOINT` is not set. Set it to the **OTLP ingest URL** from Arize AX Settings (e.g. `https://otlp.arize.com/v1`) — **not** the web-UI space URL (`app.arize.com/s/...`). `opentelemetry-sdk` pinned `<1.42` for `google-adk 2.x` compat. **Critical:** do NOT install `arize-phoenix` (full server) — it breaks `from phoenix.otel import register` on Python 3.13 via a broken `phoenix.evals.models` import chain. Use only `arize-phoenix-otel`. `openinference-instrumentation-google-genai` is installed and auto-instruments all Gemini calls once `PHOENIX_COLLECTOR_ENDPOINT` is set.
 
 ### Frontend (`frontend/src/`)
 - React 19 + Vite 8 + Tailwind v4 (via `@tailwindcss/vite`) + TypeScript. Routing via `react-router-dom`. State via **Zustand** (`store/useStore.ts`) — types: `TelemetryEvent`, `AgentAction` (includes `event_id?`, `stage?`), `FlashDeal`, `RestockBatch`, `RestockOrder` (includes `ack_at?`), `RestockAck`, `PendingApproval`, `VerificationInfo`; all `addX` actions deduplicate by key; `acknowledgeRestockOrders(event_id, acks[])` updates order status in-place; `verifications` is an `event_id → VerificationInfo` map fed by `addVerification` (keeps the highest `replan_count` per event). Charts via `recharts`, maps via `react-leaflet` (`@types/leaflet` installed), animation via `framer-motion`.
@@ -119,14 +119,48 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 - **Frontend** — `frontend/vercel.json` (Vite framework preset, SPA rewrite to `/index.html`). Set `VITE_API_BASE` to the deployed backend URL in the Vercel project's env vars (see `frontend/.env.example`). Ready for Vercel once M10 lands.
 
 ## Known issues / tech debt
-- **Live ADK + Elastic verification pending** — ADK path is live and verified with Gemini (M3 resolved); Elastic MCP tool calls fall back to in-memory haversine because ES isn't running locally. Blocked on M4/M5 (Elastic Cloud endpoint + confirm Elastic MCP server).
-- **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic call when ES creds land.
-- **OTel version pin** — `opentelemetry-sdk<1.42` required by `google-adk 2.x`; `arize-phoenix-otel` (lightweight) used instead of the full `arize-phoenix` server package to avoid the conflict. Full Phoenix UI traces require M6 (Arize AX creds) + setting `PHOENIX_COLLECTOR_ENDPOINT`.
+- **Elastic MCP server pending (M5)** — ADK + Elastic Cloud creds working (geo_distance queries hit real ES); `find_nearby_vendors` still backed by local `MCPTools.find_nearest_vendor`. Swap to the official Elastic MCP server once M5 (Docker image / hosted endpoint) confirmed.
+- **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic BM25/kNN call — interface unchanged, ES creds are live.
+- **Arize OTLP endpoint wrong** — Tracer boots (authenticated=True, Gemini instrumented) but export 404s. Fix: copy the OTLP ingest URL from Arize AX Settings (not the web-UI space URL) → update `PHOENIX_COLLECTOR_ENDPOINT` in `.env`.
+- **OTel version pin** — `opentelemetry-sdk<1.42` required by `google-adk 2.x`; all OTel packages pinned to 1.41.1. Do NOT run `pip install --upgrade opentelemetry-*` — it will pull 1.42.x and break ADK.
 - **Gemini quota** — Free tier is 5 RPM / 20 RPD for `gemini-3-flash-preview`. Auto-simulator is disabled (`SIMULATION_ACTIVE=false`) to avoid burning quota. Use manual triggers only during dev. Swap to `gemini-3.1-flash-lite` (500 RPD) if daily limit is hit.
 
 ## Knowledge graph (code-review-graph MCP)
 
 This repo is indexed by the `code-review-graph` MCP server. Prefer its tools over Grep/Glob/Read for exploration, impact analysis, and review (`semantic_search_nodes`, `query_graph`, `get_impact_radius`, `detect_changes`, `get_review_context`). The graph auto-updates on file changes. Fall back to file tools only when the graph doesn't cover what you need.
+
+## Graphify knowledge graph
+
+A full structural + semantic knowledge graph of the codebase lives in `graphify-out/`:
+
+| File | Use |
+|------|-----|
+| `graphify-out/graph.html` | Interactive browser visualization (open directly, no server needed) |
+| `graphify-out/graph.json` | Raw graph for `/graphify query` and programmatic access |
+| `graphify-out/GRAPH_REPORT.md` | Audit report — god nodes, community cohesion, surprising connections |
+
+**Built from:** 100 files · 579 nodes · 890 edges · 66 communities · 18 hyperedges (AST + semantic extraction).
+
+**God nodes** (highest cross-community connectivity): `ExecutionAgent` (40 edges) → `AgentManager` (39) → `VerificationAgent` (37). These are the highest-blast-radius touch points — changes here ripple everywhere.
+
+**Key communities:**
+- *Agent Pipeline Core* — `AgentManager`, `ExecutionAgent`, `InventoryAgent` + orchestration logic
+- *ADK Agent & Gemini Brain* — `adk_agent.py`, `LlmAgent`, `plan_via_adk`, `gemini.py`
+- *MCP Tools & Geo-Search* — `MCPTools`, `find_nearest_vendor`, haversine fallback chain
+- *RAG Verification* — `VerificationAgent`, `_retrieve_constraints`, self-correction loop
+- *Live Dashboard Panels* — React components reading from Zustand store over WebSocket
+- *Elastic Client Layer* + *Elastic Index & Ingestion* — ES client, index schemas, ingest functions
+
+**To update after code changes:**
+```bash
+cd /Users/agraw/Desktop/personal/projects/arena-plus
+/graphify . --update
+```
+
+**To query the graph:**
+```
+/graphify query "how does find_nearby_vendors reach haversine fallback"
+```
 
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
