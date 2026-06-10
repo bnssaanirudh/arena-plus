@@ -119,7 +119,7 @@ Pydantic-v2 `Settings` singleton (`settings`), env-var driven, configured via `m
 
 ## Known issues / tech debt
 - **Elastic MCP server pending (M5)** — ADK + Elastic Cloud creds working (geo_distance queries hit real ES); `find_nearby_vendors` still backed by local `MCPTools.find_nearest_vendor`. Swap to the official Elastic MCP server once M5 (Docker image / hosted endpoint) confirmed.
-- **RAG corpus is in-memory** — `verification.py` `_CONSTRAINTS` is a hardcoded list. Swap `_retrieve_constraints()` to an Elastic BM25/kNN call — interface unchanged, ES creds are live.
+- **RAG corpus on Elastic** — `verification.py` `_retrieve_constraints()` queries the `supply_constraints` ES index via BM25 (zone + description + severity boosted); falls back to in-memory `_CONSTRAINTS` if ES unavailable. Index created and populated on startup via `elastic/ingestion.py:ingest_constraints()`.
 - **Arize traces working** — Endpoint `https://app.phoenix.arize.com/s/akshatagrawal-work/v1/traces`, auth `Authorization: Bearer <key>`. Gemini calls auto-instrumented. Check `app.phoenix.arize.com/s/akshatagrawal-work` for the `arenapulse` project traces.
 - **Gemini 503 (transient)** — Free tier `gemini-3-flash-preview` hits 503 under high demand. Swap `GEMINI_MODEL=gemini-3.1-flash-lite` in `.env` (500 RPD) if it persists.
 - **OTel version pin** — `opentelemetry-sdk<1.42` required by `google-adk 2.x`; all OTel packages pinned to 1.41.1. Do NOT run `pip install --upgrade opentelemetry-*` — it will pull 1.42.x and break ADK.

@@ -85,7 +85,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 ### 1.5 Hosted project URL
 - [~] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render). `backend/Dockerfile` + `.dockerignore` ready (python:3.13-slim, `$PORT`-aware uvicorn); just needs `gcloud run deploy` once M9 lands.
 - [~] 1.5.2 Deploy **frontend** (Vercel / Firebase Hosting) with `VITE_API_BASE` → deployed backend. `frontend/vercel.json` (SPA rewrite + Vite preset) ready; set `VITE_API_BASE` in Vercel env once M10 lands.
-- [ ] 1.5.3 Decide whether Elastic + Gemini run live in prod or in a scripted-demo mode (manage trial-credit/key exposure)
+- [x] 1.5.3 **Decision: hybrid mode** — `SIMULATION_ACTIVE=false` (no auto-trigger), `DRY_RUN=false` (full execution), `GEMINI_MODEL=gemini-3.1-flash-lite` (500 RPD, avoids 503), `APPROVAL_REQUIRED=false`. Judges trigger manually via "Run Demo" button; full Gemini + Elastic + Arize pipeline runs live; no quota burn from idle visitors.
 - [ ] 1.5.4 Smoke-test the deployed URL end-to-end (surge → agent → MCP → action visible on dashboard)
 
 ### 1.6 Devpost submission package
@@ -102,7 +102,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 The project_idea.md workflow has 4 steps + 2 actions. Step 3 (RAG verify) remains; **Action A + Action B + human oversight are done**.
 
 ### 2.1 Step 3 — Corrective RAG verification ("is the supply chain viable?")
-- [x] 2.1.1 In-memory supply-chain constraint corpus (8 constraints: road closures, depot capacity, lead times across zones) — `agents/verification.py` `_CONSTRAINTS`. Upgrades to Elastic BM25/kNN by replacing `_retrieve_constraints()` body; interface unchanged.
+- [x] 2.1.1 Supply-chain constraint corpus on Elastic — 8 constraints (road closures, depot capacity, lead times) in `supply_constraints` ES index (BM25 mappings in `elastic/indexes.py`, ingested at startup via `elastic/ingestion.py:ingest_constraints()`). `_retrieve_constraints()` queries ES first; in-memory `_CONSTRAINTS` list is fallback only.
 - [x] 2.1.2 `VerificationAgent.verify()` retrieves relevant constraints (keyword match on zone + action) and checks feasibility — Gemini primary, heuristic fallback
 - [x] 2.1.3 Self-correction loop in `manager._verify_with_correction()`: if infeasible, re-runs Planning with constraint context injected → re-runs Inventory+Validation. Up to `MAX_REPLANS=2` attempts. `plan["replan_count"]` tags corrected plans.
 - [x] 2.1.4 Publishes to `AGENT_VERIFICATION` channel; WS formats "✅ feasible" or "⚠️ self-correcting (attempt N)"; re-plan shows "↻ Re-plan:" prefix in agent panel
