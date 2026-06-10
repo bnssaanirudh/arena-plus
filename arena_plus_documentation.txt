@@ -1,0 +1,141 @@
+================================================================================
+                       ARENAPULSE - SYSTEM DOCUMENTATION
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+ArenaPulse is an autonomous, multi-agent command and logistics platform designed 
+for large-scale events (modeled around the FIFA World Cup 2026 at SoFi Stadium). 
+Instead of acting merely as a conversational chatbot, ArenaPulse is action-oriented:
+it ingests real-time crowd telemetry, dynamically detects safety or logistics 
+surges, plans interventions, verifies supply chain feasibility, and executes 
+remedial dispatches and promotional flash deals—all streamed in real time to an 
+interactive dashboard.
+
+This project was built for the Google Cloud "Building Agents for Real-World 
+Challenges" hackathon, competing in the Elastic Partner Track.
+
+2. CORE FEATURES & PIPELINE STAGES
+--------------------------------------------------------------------------------
+The system coordinates stadium logistics through a highly structured 8-stage 
+agent pipeline:
+
+* STAGE 1: PERCEPTION
+  - Purpose: Identifies density surges and potential hazards.
+  - Implementation: Features an ML SurgePredictor pre-filter that makes a fast 
+    preliminary assessment, followed by Gemini 3 primary reasoning to output a 
+    structured JSON risk assessment ({risk_level, probability, reasoning}).
+
+* STAGE 2: PLANNING
+  - Purpose: Decides the best action to take based on the perception risk level.
+  - Implementation: Uses the Google Cloud Agent Development Kit (ADK) with Gemini 3 
+    to decide the required action, target zone, resources, and reasoning. Action 
+    types include MONITOR, DISPATCH_RESOURCES, REROUTE_CROWD, ALERT_SECURITY, 
+    and EVACUATE_ZONE.
+
+* STAGE 3: INVENTORY
+  - Purpose: Allocates resources by locating available stock near the surge zone.
+  - Implementation: Performs a geospatial query over the stadium's vendor 
+    database (using Elasticsearch coordinates) to find the closest concessions 
+    that have sufficient stock of requested goods (food, water, merchandise).
+
+* STAGE 4: VALIDATION
+  - Purpose: Double-checks that inventory allocations are actually sufficient 
+    to fulfill the planned dispatch.
+  - Implementation: Assesses total allocated stock against the requested amount, 
+    tagging the pipeline as VALID or INVALID (aborting execution if stock is lacking).
+
+* STAGE 5: VERIFICATION (Corrective RAG)
+  - Purpose: Checks the plan against real-world logistics and supply chain 
+    constraints (e.g. road closures, depot capacity limits, delivery delays).
+  - Implementation: Performs a Retrieval-Augmented Generation (RAG) query using 
+    Elasticsearch (BM25 search matching keywords like "South Gate" or "Evacuate") 
+    to retrieve constraints. If Gemini detects the plan is blocked, it injects 
+    the constraint context back into the planner to trigger a corrective self-correction 
+    re-plan (up to 2 times).
+
+* STAGE 6: HUMAN GATE (Human-in-the-Loop)
+  - Purpose: Prevents high-risk actions from executing without human oversight.
+  - Implementation: Holds any high-impact actions (like EVACUATE_ZONE or massive 
+    dispatches) in a PENDING_APPROVAL state. Operators can review details and 
+    click Approve or Reject on the dashboard.
+
+* STAGE 7: EXECUTION
+  - Purpose: Commits the plan, updates vendor inventory, and dispatches help.
+  - Implementation: Emits structured B2B restock purchase orders (PO-xxxx) to 
+    suppliers. A background process simulates supplier acknowledgements (8-20s delay), 
+    updating the order status on the dashboard from "ordered" to "✓ acked".
+
+* STAGE 8: MARKETING
+  - Purpose: Drives monetization and commercial optimization.
+  - Implementation: Uses Gemini 3 to draft hyper-local flash deals (e.g., "50% off 
+    water at Stand B, valid for 30 minutes in the South Gate") targeted at crowd 
+    density areas, sending them directly to fans.
+
+3. TECH STACK & SYSTEM ARCHITECTURE
+--------------------------------------------------------------------------------
+We use a modern, robust, and decoupled tech stack selected for speed, 
+scale, and hackathon requirements:
+
+* FASTAPI (Backend)
+  - Why: Python-based asynchronous framework that serves REST endpoints and 
+    manages real-time WebSockets to stream agent logs to the dashboard.
+* REACT 19 + VITE + TAILWIND V4 + ZUSTAND (Frontend)
+  - Why: Leverages React 19 concurrent features, Vite chunk-splitting for extremely 
+    fast bundle load times (~272 kB main bundle), Tailwind v4 for sleek, modern 
+    glassmorphism styling, and Zustand for high-performance frontend state 
+    management (with strict deduplication of telemetry/agent events).
+* GEMINI 3 (via google-genai SDK)
+  - Why: Serves as the cognitive brain. Its fast JSON-schema mode allows the 
+    Perception, Planning, Verification, and Marketing agents to generate structured, 
+    parseable operational data.
+* GOOGLE AGENT DEVELOPMENT KIT (ADK)
+  - Why: Code-first framework for Google Cloud Agent Builder. Implements the 
+    arenapulse_coordinator LlmAgent and exposes the Elastic vendor search tool.
+* ELASTICSEARCH (MCP & Direct Client)
+  - Why: Competing in the Elastic Partner Track. Elasticsearch is used to index 
+    stadium zones, concessions, and supply constraints. It acts as the RAG vector 
+    and BM25 retrieval corpus for verification constraints and geo-searches.
+* ARIZE PHOENIX / OPENTELEMETRY
+  - Why: Provides complete observability. All calls to Gemini, the ADK agent, 
+    and the Elastic MCP server are instrumented using OpenTelemetry, pushing 
+    structured traces to Arize.
+* MOCK REDIS (In-Memory Pub/Sub)
+  - Why: An in-memory asynchronous pub/sub system that serves as the event broker 
+    between the simulator, agents, and WebSockets, allowing the system to run 
+    with zero external database dependencies for local development.
+
+4. USER INTERACTIVE PLATFORM FEATURES
+--------------------------------------------------------------------------------
+The frontend dashboard provides a comprehensive command console:
+
+* INTERACTIVE STADIUM MAP
+  - Leaflet-powered SoFi stadium map visualizing gates, concessions, zones, and 
+    active safety/crowd surges.
+* EVENT TIMELINE
+  - A horizontal event timeline card system showing the 8 pipeline stages as they 
+    complete. Integrates a RAG feasibility badge (e.g. showing "5 feasible" or 
+    "5 ↻1" indicating a self-correction replan occurred).
+* AI COPILOT & COMMAND CHAT
+  - Real-time chat console powered by Gemini 3. Allows stadium operators to query 
+    system status, ask about low-stock concessions, or trigger alerts.
+* SUPPLY HUB & RESTOCK PANEL
+  - Real-time restock ledger showing pending POs (status: "ordered" or "✓ acked") 
+    along with vendor and supplier information.
+* SYSTEM STATUS & CONSOLE
+  - Dedicated diagnostic page displaying connection state for Elasticsearch, 
+    Arize Phoenix tracing, Gemini, and the simulation engine. Allows operators 
+    to adjust settings (e.g. toggle human approval or strict RAG mode).
+* DEMO CONTROLS
+  - Control deck containing "Run Demo" (runs a scripted 5-stage World Cup surge 
+    scenario) and "Trigger Surge" (manually injects a random surge).
+
+5. DESIGN AND GRACEFUL DEGRADATION
+--------------------------------------------------------------------------------
+* Sleek Dark Mode: Uses premium modern glassmorphic UI components, smooth 
+  micro-animations (Framer Motion), explicit layouts (to prevent unbounded growth), 
+  and professional, tailored color schemes.
+* Zero-Dependency Boot: Respects the "graceful degradation" principle. If no 
+  keys/credentials are present in .env, the system automatically falls back to 
+  heuristic planners and in-memory caches, remaining fully runnable and testable.
+================================================================================
