@@ -36,7 +36,7 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [ ] M2. Enable **Vertex AI API**, **Cloud Run**, **Agent Builder** in that project
 - [x] M3. Confirm the exact **Gemini 3 model id** available to you (verify in Vertex console; update `GEMINI_MODEL`) — **done: `gemini-3-flash-preview` (AI Studio); full pipeline smoke-tested (M8)**
 - [x] M4. Start an **Elastic Cloud 14-day trial** → share **Elasticsearch endpoint URL** + **API key**
-- [ ] M5. Confirm you can run the **Elastic MCP server** (Docker image or hosted endpoint)
+- [x] M5. Confirm you can run the **Elastic MCP server** — `ELASTIC_MCP_URL` + `ELASTIC_API_KEY` set in Railway vars; ADK agent uses official `McpToolset` when `ELASTIC_MCP_URL` is set, local `find_nearby_vendors` FunctionTool otherwise
 - [x] M6. (Secondary) Create a free **Arize AX** account → traces exporting to `app.phoenix.arize.com/s/akshatagrawal-work`; Gemini calls auto-instrumented. Endpoint: `https://app.phoenix.arize.com/s/<space>/v1/traces` + `Authorization: Bearer <key>`.
 
 **After Phase 1–4 build (once agent + MCP + actions work locally):**
