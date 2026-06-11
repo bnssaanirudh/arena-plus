@@ -43,14 +43,13 @@ class Settings(BaseSettings):
     # autonomously call the Elastic vendor-search tool. Falls back to direct Gemini
     # JSON, then the deterministic heuristic — preserving zero-external-deps boot.
     USE_ADK: bool = os.getenv("USE_ADK", "true").lower() == "true"
-    ELASTIC_MCP_URL: str = os.getenv("ELASTIC_MCP_URL", "")
 
-    # Official Elastic MCP server SSE endpoint. When set, the ADK agent registers the
-    # official Elastic MCP toolset (MCPToolset + SseServerParams) alongside the local
-    # find_nearby_vendors FunctionTool. Gemini can then call native Elasticsearch tools
-    # (elasticsearch_search, etc.) directly during planning. Leave empty to use the
-    # local Elasticsearch client wrapper only.
+    # Official Elastic MCP server endpoint. When set, the ADK agent registers the
+    # official Elastic MCP toolset alongside the local find_nearby_vendors FunctionTool.
+    # Supports SSE (URL contains "sse") or StreamableHTTP (agent_builder/mcp) transports.
+    # Auth headers injected automatically when ELASTIC_API_KEY is set.
     ELASTIC_MCP_URL: str = os.getenv("ELASTIC_MCP_URL", "")
+    ELASTIC_API_KEY: str = os.getenv("ELASTIC_API_KEY", "")
 
     # Human-in-the-loop oversight. When True, high-impact actions (EVACUATE_ZONE and
     # large dispatches) are held as PENDING_APPROVAL instead of auto-executing.

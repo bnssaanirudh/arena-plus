@@ -336,7 +336,7 @@ class TestADKElasticMCP:
             with patch.object(adk_agent.logger, "info") as mock_info:
                 runner, session_service = _get_runner()
                 assert runner is not None
-                from google.adk.tools.mcp_tool import SseConnectionParams
+                from google.adk.tools.mcp_tool.mcp_toolset import SseConnectionParams
                 assert isinstance(adk_agent._elastic_mcp_toolset._connection_params, SseConnectionParams)
                 mock_info.assert_any_call(f"[ADK] Official Elastic MCP toolset registered — http://localhost:3001/sse")
         finally:
@@ -363,7 +363,7 @@ class TestADKElasticMCP:
             with patch.object(adk_agent.logger, "info") as mock_info:
                 runner, session_service = _get_runner()
                 assert runner is not None
-                from google.adk.tools.mcp_tool import StreamableHTTPConnectionParams
+                from google.adk.tools.mcp_tool.mcp_toolset import StreamableHTTPConnectionParams
                 assert isinstance(adk_agent._elastic_mcp_toolset._connection_params, StreamableHTTPConnectionParams)
                 mock_info.assert_any_call(f"[ADK] Official Elastic MCP toolset registered — http://localhost:3001/mcp")
         finally:
