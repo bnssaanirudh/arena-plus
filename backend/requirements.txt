@@ -19,6 +19,7 @@ xgboost>=2.0.0
 # Agent brain: Gemini 3 + Google Cloud Agent Builder (ADK)
 google-genai>=1.0.0
 google-adk>=2.0.0
+mcp>=1.0.0
 
 # Observability (Arize partner integration)
 # DO NOT install arize-phoenix (full server) — its deps break on Python 3.13 / google-adk 2.x.

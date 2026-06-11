@@ -313,3 +313,42 @@ class TestVerificationAgent:
         if result["plan"]["action"] != "MONITOR":
             assert "verification" in result
             assert "feasible" in result["verification"]
+
+
+class TestADKElasticMCP:
+    """Tests for the ADK agent with Elastic MCP integration."""
+
+    @pytest.mark.asyncio
+    async def test_elastic_mcp_registration(self):
+        from app.config import settings
+        import app.agents.adk_agent as adk_agent
+        from app.agents.adk_agent import _get_runner
+        from unittest.mock import patch
+
+        # Reset global state to force recreation
+        adk_agent._runner = None
+        adk_agent._agent = None
+
+        old_url = settings.ELASTIC_MCP_URL
+        settings.ELASTIC_MCP_URL = "http://localhost:3001/sse"
+        
+        try:
+            with patch.object(adk_agent.logger, "info") as mock_info:
+                runner, session_service = _get_runner()
+                
+                # Check that the runner and agent were created
+                assert runner is not None
+                assert adk_agent._agent is not None
+                
+                # Check that the tools contains McpToolset
+                from google.adk.tools.mcp_tool import McpToolset
+                assert any(isinstance(t, McpToolset) for t in adk_agent._agent.tools)
+                
+                # Check log messages
+                mock_info.assert_any_call(f"[ADK] Official Elastic MCP toolset registered — http://localhost:3001/sse")
+        finally:
+            settings.ELASTIC_MCP_URL = old_url
+            adk_agent._runner = None
+            adk_agent._agent = None
+
+

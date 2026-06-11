@@ -97,9 +97,9 @@ def _get_elastic_mcp_toolset():
     if not settings.ELASTIC_MCP_URL:
         return None
     try:
-        from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, SseServerParams
-        _elastic_mcp_toolset = MCPToolset(
-            connection_params=SseServerParams(url=settings.ELASTIC_MCP_URL)
+        from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
+        _elastic_mcp_toolset = McpToolset(
+            connection_params=SseConnectionParams(url=settings.ELASTIC_MCP_URL)
         )
         logger.info(
             f"[ADK] Official Elastic MCP toolset registered — {settings.ELASTIC_MCP_URL}"

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # autonomously call the Elastic vendor-search tool. Falls back to direct Gemini
     # JSON, then the deterministic heuristic — preserving zero-external-deps boot.
     USE_ADK: bool = os.getenv("USE_ADK", "true").lower() == "true"
+    ELASTIC_MCP_URL: str = os.getenv("ELASTIC_MCP_URL", "")
 
     # Official Elastic MCP server SSE endpoint. When set, the ADK agent registers the
     # official Elastic MCP toolset (MCPToolset + SseServerParams) alongside the local
