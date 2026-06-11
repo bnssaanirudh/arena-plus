@@ -97,10 +97,14 @@ def _get_elastic_mcp_toolset():
     if not settings.ELASTIC_MCP_URL:
         return None
     try:
-        from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
-        _elastic_mcp_toolset = McpToolset(
-            connection_params=SseConnectionParams(url=settings.ELASTIC_MCP_URL)
-        )
+        if "sse" in settings.ELASTIC_MCP_URL.lower():
+            from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
+            params = SseConnectionParams(url=settings.ELASTIC_MCP_URL)
+        else:
+            from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
+            params = StreamableHTTPConnectionParams(url=settings.ELASTIC_MCP_URL)
+
+        _elastic_mcp_toolset = McpToolset(connection_params=params)
         logger.info(
             f"[ADK] Official Elastic MCP toolset registered — {settings.ELASTIC_MCP_URL}"
         )
