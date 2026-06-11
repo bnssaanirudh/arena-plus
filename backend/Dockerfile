@@ -1,6 +1,7 @@
 # ArenaPulse backend — Cloud Run / container image
 # Build from the backend/ directory:  docker build -t arenapulse-backend backend/
-FROM python:3.13-slim
+FROM python:3.12-slim
+
 
 # Keep Python lean and unbuffered (logs flush immediately on Cloud Run)
 ENV PYTHONUNBUFFERED=1 \
