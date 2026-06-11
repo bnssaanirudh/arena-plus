@@ -97,12 +97,14 @@ def _get_elastic_mcp_toolset():
     if not settings.ELASTIC_MCP_URL:
         return None
     try:
-        if "sse" in settings.ELASTIC_MCP_URL.lower():
+        auth_headers = {"Authorization": f"ApiKey {settings.ELASTIC_API_KEY}"} if getattr(settings, "ELASTIC_API_KEY", None) else None
+        
+        if "sse" in settings.ELASTIC_MCP_URL.lower() or "agent_builder/mcp" in settings.ELASTIC_MCP_URL.lower():
             from google.adk.tools.mcp_tool import McpToolset, SseConnectionParams
-            params = SseConnectionParams(url=settings.ELASTIC_MCP_URL)
+            params = SseConnectionParams(url=settings.ELASTIC_MCP_URL, timeout=30.0, headers=auth_headers)
         else:
             from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-            params = StreamableHTTPConnectionParams(url=settings.ELASTIC_MCP_URL)
+            params = StreamableHTTPConnectionParams(url=settings.ELASTIC_MCP_URL, timeout=30.0, headers=auth_headers)
 
         _elastic_mcp_toolset = McpToolset(connection_params=params)
         logger.info(
