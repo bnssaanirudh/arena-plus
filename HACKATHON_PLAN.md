@@ -83,8 +83,8 @@ These need a human (accounts, billing, recording, form-filling). Claude builds e
 - [x] 1.4.6 Confirm in logs/traces that the agent's reasoning includes a real MCP tool invocation — verified with Elastic Cloud
 
 ### 1.5 Hosted project URL
-- [~] 1.5.1 Deploy **backend** (Cloud Run recommended — same ecosystem as Agent Builder; or Railway/Render). `backend/Dockerfile` + `.dockerignore` ready (python:3.13-slim, `$PORT`-aware uvicorn); just needs `gcloud run deploy` once M9 lands.
-- [~] 1.5.2 Deploy **frontend** (Vercel / Firebase Hosting) with `VITE_API_BASE` → deployed backend. `frontend/vercel.json` (SPA rewrite + Vite preset) ready; set `VITE_API_BASE` in Vercel env once M10 lands.
+- [x] 1.5.1 Deploy **backend** — **Railway live.** `backend/Dockerfile` (python:3.12-slim, `$PORT`-aware uvicorn). Root directory = `backend/`; Railway auto-detects Dockerfile.
+- [x] 1.5.2 Deploy **frontend** — **Vercel live.** `frontend/vercel.json` (SPA rewrite + Vite preset); `VITE_API_BASE` set to Railway URL in Vercel env vars.
 - [x] 1.5.3 **Decision: hybrid mode** — `SIMULATION_ACTIVE=false` (no auto-trigger), `DRY_RUN=false` (full execution), `GEMINI_MODEL=gemini-3.1-flash-lite` (500 RPD, avoids 503), `APPROVAL_REQUIRED=false`. Judges trigger manually via "Run Demo" button; full Gemini + Elastic + Arize pipeline runs live; no quota burn from idle visitors.
 - [ ] 1.5.4 Smoke-test the deployed URL end-to-end (surge → agent → MCP → action visible on dashboard)
 
