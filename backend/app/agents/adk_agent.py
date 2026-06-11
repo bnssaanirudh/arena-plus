@@ -35,6 +35,7 @@ _import_ok: Optional[bool] = None
 _agent = None
 _runner = None
 _session_service = None
+_elastic_mcp_toolset = None
 
 _APP_NAME = "arenapulse"
 _USER_ID = "arena-coordinator"
@@ -44,10 +45,12 @@ _INSTRUCTION = (
     "crowd safety and vendor supply at a FIFA World Cup 2026 stadium.\n\n"
     "Given a perceived risk assessment and live telemetry for a zone, decide the "
     "single best intervention. When an intervention may need supplies dispatched, "
-    "FIRST call the `find_nearby_vendors` tool to see which vendors are near the "
-    "affected zone and what stock they hold, then size your resource request to "
-    "reality. Be decisive and operationally specific. Use MONITOR only when risk is "
-    "genuinely low; reserve EVACUATE_ZONE for CRITICAL life-safety situations.\n\n"
+    "FIRST use the available Elasticsearch tools to find which vendors are near the "
+    "affected zone and what stock they hold — prefer `elasticsearch_search` on the "
+    "`vendors` index with a geo_distance filter if available, otherwise call "
+    "`find_nearby_vendors`. Size your resource request to reality. Be decisive and "
+    "operationally specific. Use MONITOR only when risk is genuinely low; reserve "
+    "EVACUATE_ZONE for CRITICAL life-safety situations.\n\n"
     "Allowed actions: MONITOR, DISPATCH_RESOURCES, REROUTE_CROWD, ALERT_SECURITY, "
     "EVACUATE_ZONE. Priorities: P0 (highest) .. P3.\n\n"
     "Your FINAL message MUST be ONLY a JSON object (no prose, no code fences) of the "
@@ -81,6 +84,32 @@ async def find_nearby_vendors(
     return vendors
 
 
+def _get_elastic_mcp_toolset():
+    """Lazily create an MCPToolset connected to the official Elastic MCP server.
+
+    Returns the toolset when ELASTIC_MCP_URL is set and google-adk MCPToolset is
+    importable. Returns None silently otherwise — the agent falls back to the local
+    find_nearby_vendors FunctionTool in that case.
+    """
+    global _elastic_mcp_toolset
+    if _elastic_mcp_toolset is not None:
+        return _elastic_mcp_toolset
+    if not settings.ELASTIC_MCP_URL:
+        return None
+    try:
+        from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, SseServerParams
+        _elastic_mcp_toolset = MCPToolset(
+            connection_params=SseServerParams(url=settings.ELASTIC_MCP_URL)
+        )
+        logger.info(
+            f"[ADK] Official Elastic MCP toolset registered — {settings.ELASTIC_MCP_URL}"
+        )
+        return _elastic_mcp_toolset
+    except Exception as e:
+        logger.warning(f"[ADK] Elastic MCP toolset unavailable, falling back to local tool: {e}")
+        return None
+
+
 def _try_imports() -> bool:
     """True if google-adk can be imported. Cached; never raises."""
     global _import_ok
@@ -112,12 +141,19 @@ def _get_runner():
         from google.adk.sessions import InMemorySessionService
         from google.adk.tools import FunctionTool
 
+        # Build tool list: official Elastic MCP toolset first (when configured),
+        # then the local FunctionTool as a fallback.
+        tools: list = [FunctionTool(find_nearby_vendors)]
+        elastic_toolset = _get_elastic_mcp_toolset()
+        if elastic_toolset is not None:
+            tools.insert(0, elastic_toolset)
+
         _agent = LlmAgent(
             name="arenapulse_coordinator",
             model=settings.GEMINI_MODEL,
             description="Autonomous crowd-safety & vendor-supply coordinator for ArenaPulse.",
             instruction=_INSTRUCTION,
-            tools=[FunctionTool(find_nearby_vendors)],
+            tools=tools,
         )
         _session_service = InMemorySessionService()
         _runner = Runner(
@@ -125,7 +161,12 @@ def _get_runner():
             agent=_agent,
             session_service=_session_service,
         )
-        logger.info(f"ADK agent ready (model={settings.GEMINI_MODEL}, tools=[find_nearby_vendors])")
+        tool_names = (
+            ["elastic_mcp_toolset"] if elastic_toolset else []
+        ) + ["find_nearby_vendors"]
+        logger.info(
+            f"ADK agent ready (model={settings.GEMINI_MODEL}, tools={tool_names})"
+        )
         return _runner, _session_service
     except Exception as e:  # pragma: no cover - depends on external SDK/creds
         logger.warning(f"Failed to build ADK agent/runner: {e}")
