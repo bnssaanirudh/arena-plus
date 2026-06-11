@@ -5,9 +5,10 @@ from typing import List, Dict, Any
 
 fake = Faker()
 
-# Stadium rough bounding box for generating realistic-looking coordinates
-STADIUM_CENTER_LAT = 34.0141
-STADIUM_CENTER_LON = -118.2879
+# SoFi Stadium center — must match the zone coords in simulator/events.py and
+# simulator/demo.py, otherwise the agent's geo_distance vendor search finds nothing.
+STADIUM_CENTER_LAT = 33.9534
+STADIUM_CENTER_LON = -118.3392
 RADIUS_DEG = 0.005  # roughly 500m
 
 def generate_vendors(count: int = 50) -> List[Dict[str, Any]]:

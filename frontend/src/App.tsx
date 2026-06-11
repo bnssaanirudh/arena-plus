@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Capabilities from './pages/Capabilities';
@@ -27,6 +27,7 @@ export default function App() {
         <Route path="/analytics" element={<GlobalAnalytics />} />
         <Route path="/supply-hub" element={<SupplyHub />} />
         <Route path="/operator" element={<OperatorCenter />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <AICopilot />
     </Router>

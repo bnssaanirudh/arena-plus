@@ -238,7 +238,9 @@ async def plan_via_adk(event_data: dict, risk_assessment: dict) -> Optional[Dict
     try:
         from google.genai import types
 
-        session_id = f"evt-{event_data.get('event_id', uuid.uuid4().hex)}"
+        # Unique per call — a self-correction replan reuses the same event_id, and
+        # create_session raises "already exists" on a duplicate id.
+        session_id = f"evt-{event_data.get('event_id', 'na')}-{uuid.uuid4().hex[:8]}"
         await session_service.create_session(
             app_name=_APP_NAME, user_id=_USER_ID, session_id=session_id
         )
