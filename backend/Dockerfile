@@ -31,4 +31,7 @@ EXPOSE 8000
 
 # Cloud Run injects $PORT; default 8000 for local `docker run`.
 # Use shell form so $PORT is expanded at runtime.
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+# --proxy-headers + --forwarded-allow-ips: trust X-Forwarded-Proto from the
+# Railway/Cloud Run TLS proxy so redirects (e.g. FastAPI's 307 trailing-slash)
+# point at https:// — browsers block http redirects from https pages.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips "*"

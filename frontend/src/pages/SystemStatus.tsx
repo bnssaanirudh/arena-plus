@@ -90,7 +90,7 @@ export default function SystemStatus() {
   const fetchStatus = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/status`);
+      const res = await fetch(`${API_BASE}/api/v1/status/`);
       const payload = await res.json();
       setData(payload);
       setLogs(prev => [

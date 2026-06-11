@@ -27,7 +27,7 @@ export default function SupplyHub() {
   const fetchVendors = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/vendors`);
+      const res = await fetch(`${API_BASE}/api/v1/vendors/`);
       const payload = await res.json();
       setVendors(payload);
     } catch (err) {
